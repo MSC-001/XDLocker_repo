@@ -1,10 +1,69 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="purple_200">#FFBB86FC</color>
-    <color name="purple_500">#FF6200EE</color>
-    <color name="purple_700">#FF3700B3</color>
-    <color name="teal_200">#FF03DAC5</color>
-    <color name="teal_700">#FF018786</color>
-    <color name="black">#FF000000</color>
-    <color name="white">#FFFFFFFF</color>
+
+    <!-- Primary Colors -->
+    <color name="primary_color">#1976D2</color>
+    <color name="primary_variant">#1565C0</color>
+    <color name="primary_container">#E3F2FD</color>
+    <color name="on_primary_container">#0D47A1</color>
+
+    <!-- Secondary Colors -->
+    <color name="secondary_color">#43A047</color>
+    <color name="secondary_variant">#388E3C</color>
+    <color name="secondary_container">#E8F5E8</color>
+    <color name="on_secondary_container">#1B5E20</color>
+
+    <!-- Surface Colors -->
+    <color name="surface_color">#FFFFFF</color>
+    <color name="surface_variant">#F5F5F5</color>
+    <color name="on_surface">#212121</color>
+    <color name="on_surface_variant">#616161</color>
+
+    <!-- Background Colors -->
+    <color name="background_color">#FAFAFA</color>
+    <color name="on_background">#212121</color>
+
+    <!-- Error Colors -->
+    <color name="error_color">#E53935</color>
+    <color name="error_container">#FFEBEE</color>
+    <color name="on_error_container">#B71C1C</color>
+
+    <!-- Basic Colors -->
+    <color name="white">#FFFFFF</color>
+    <color name="black">#000000</color>
+    <color name="transparent">#00000000</color>
+
+    <!-- Splash Screen -->
+    <color name="splash_background">#1976D2</color>
+
+    <!-- Database Theme Colors -->
+    <color name="theme_blue">#2196F3</color>
+    <color name="theme_green">#4CAF50</color>
+    <color name="theme_purple">#9C27B0</color>
+    <color name="theme_orange">#FF9800</color>
+    <color name="theme_red">#F44336</color>
+    <color name="theme_teal">#009688</color>
+    <color name="theme_pink">#E91E63</color>
+    <color name="theme_indigo">#3F51B5</color>
+
+    <!-- Password Strength Colors -->
+    <color name="strength_very_weak">#E53935</color>
+    <color name="strength_weak">#FF5722</color>
+    <color name="strength_medium">#FF9800</color>
+    <color name="strength_strong">#43A047</color>
+    <color name="strength_very_strong">#2E7D32</color>
+
+    <!-- Status Colors -->
+    <color name="success_color">#4CAF50</color>
+    <color name="warning_color">#FF9800</color>
+    <color name="info_color">#2196F3</color>
+
+    <!-- Dark Theme Colors -->
+    <color name="dark_background">#121212</color>
+    <color name="dark_surface">#1E1E1E</color>
+    <color name="dark_surface_variant">#2C2C2C</color>
+    <color name="dark_on_surface">#E0E0E0</color>
+    <color name="dark_on_surface_variant">#BDBDBD</color>
+    <color name="dark_outline">#616161</color>
+
 </resources>
