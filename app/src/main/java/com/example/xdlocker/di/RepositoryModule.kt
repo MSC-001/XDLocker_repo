@@ -16,15 +16,6 @@ import javax.inject.Singleton
 object RepositoryModule {
 
     /**
-     * Provides DatabaseManager singleton
-     */
-    @Provides
-    @Singleton
-    fun provideDatabaseManager(@ApplicationContext context: Context): DatabaseManager {
-        return DatabaseManager.getInstance(context)
-    }
-
-    /**
      * Provides MetadataRepository singleton
      */
     @Provides

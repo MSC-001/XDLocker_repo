@@ -35,6 +35,7 @@
 
     <!-- Splash Screen -->
     <color name="splash_background">#1976D2</color>
+    <color name="splash_icon">#FFFFFF</color>
 
     <!-- Database Theme Colors -->
     <color name="theme_blue">#2196F3</color>

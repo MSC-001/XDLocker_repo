@@ -1,12 +1,16 @@
 package com.example.xdlocker.utils
 
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.pm.PackageManager
 import android.widget.Toast
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.security.MessageDigest
 import java.text.SimpleDateFormat
 import java.util.*
@@ -310,10 +314,10 @@ sealed class ValidationResult {
 
 // Debounce utility for search
 class Debouncer(private val delayMs: Long = Constants.SEARCH_DEBOUNCE_DELAY) {
-    private var debounceJob: kotlinx.coroutines.Job? = null
+    private var debounceJob: Job? = null
 
     fun debounce(
-        coroutineScope: kotlinx.coroutines.CoroutineScope,
+        coroutineScope: CoroutineScope,
         action: suspend () -> Unit
     ) {
         debounceJob?.cancel()
@@ -337,8 +341,10 @@ object ClipboardUtils {
             delay(delayMs)
             // Clear clipboard for security
             val clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE)
-                    as android.content.ClipboardManager
-            clipboardManager.clearPrimaryClip()
+                    as ClipboardManager
+            clipboardManager.setPrimaryClip(
+                android.content.ClipData.newPlainText("", "")
+            )
         }
     }
 }

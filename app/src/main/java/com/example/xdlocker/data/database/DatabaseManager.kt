@@ -1,12 +1,12 @@
 package com.example.xdlocker.data.database
 
 import android.content.Context
+import com.example.xdlocker.data.dao.UserDatabaseInfoDao
 import com.example.xdlocker.data.entities.UserDatabaseInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import java.io.File
 
 /**
  * Centralized manager for all database operations
@@ -39,7 +39,7 @@ class DatabaseManager private constructor(private val context: Context) {
     /**
      * Gets the metadata database DAO
      */
-    fun getMetadataDao() = metadataDatabase.userDatabaseInfoDao()
+    fun getMetadataDao(): UserDatabaseInfoDao = metadataDatabase.userDatabaseInfoDao()
 
     /**
      * Creates a new password database and adds it to metadata
@@ -284,20 +284,5 @@ class DatabaseManager private constructor(private val context: Context) {
             }
             activeDatabases.clear()
         }
-    }
-
-    /**
-     * Gets list of all active database filenames
-     */
-    fun getActiveDatabaseFilenames(): List<String> {
-        return activeDatabases.keys.toList()
-    }
-
-    /**
-     * Cleanup method to be called when app is destroyed
-     */
-    suspend fun cleanup() {
-        closeAllDatabases()
-        metadataDatabase.close()
     }
 }

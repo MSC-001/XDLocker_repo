@@ -1,10 +1,9 @@
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)      // Main Kotlin plugin
-    alias(libs.plugins.kotlin.kapt)         // Changed to alias
-    alias(libs.plugins.kotlin.parcelize)  // Parcelize plugin by ID
-    alias(libs.plugins.hilt.android)        // Hilt plugin
-    alias(libs.plugins.kotlin.compose)      // Compose plugin
+    alias(libs.plugins.jetbrains.kotlin.android)
+    alias(libs.plugins.kotlin.kapt)
+    alias(libs.plugins.hilt.android)
+    id("kotlin-parcelize")
 }
 
 android {
@@ -48,7 +47,7 @@ android {
     }
 
     composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.11"
+        kotlinCompilerExtensionVersion = "1.5.8"
     }
 
     packaging {
@@ -63,6 +62,7 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.core.splashscreen)
 
     // Compose BOM
     implementation(platform(libs.androidx.compose.bom))
@@ -71,37 +71,34 @@ dependencies {
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
 
-    // Compose additional
-    implementation("androidx.compose.material:material-icons-extended:1.5.8")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
-    implementation("androidx.navigation:navigation-compose:2.7.6")
+    // Navigation
+    implementation(libs.androidx.navigation.compose)
 
     // Room Database
-    implementation("androidx.room:room-runtime:2.6.1")
-    implementation("androidx.room:room-ktx:2.6.1")
-    kapt("androidx.room:room-compiler:2.6.1")
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    kapt(libs.androidx.room.compiler)
 
     // SQLCipher for encryption
-    implementation("net.zetetic:android-database-sqlcipher:4.5.4")
-    implementation("androidx.sqlite:sqlite:2.4.0")
+    implementation(libs.sqlcipher)
+    implementation(libs.androidx.sqlite)
 
     // Dependency Injection (Hilt)
-    implementation("com.google.dagger:hilt-android:2.48.1")
-    implementation("androidx.hilt:hilt-navigation-compose:1.1.0")
-    //kapt("com.google.dagger:hilt-compiler:2.48.1")
+    implementation(libs.hilt.android)
+    implementation(libs.androidx.hilt.navigation.compose)
+    kapt(libs.hilt.compiler)
 
     // Coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    implementation(libs.kotlinx.coroutines.android)
 
     // ViewModel
-    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.7.0")
-    implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.7.0")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
 
     // Biometric Authentication
-    implementation("androidx.biometric:biometric:1.1.0")
+    implementation(libs.androidx.biometric)
 
-    // Security for app-level encryption
-    implementation("androidx.security:security-crypto:1.1.0-alpha06")
+    // Security
+    implementation(libs.androidx.security.crypto)
 
     // Testing
     testImplementation(libs.junit)
