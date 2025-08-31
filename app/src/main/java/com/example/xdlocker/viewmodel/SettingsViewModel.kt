@@ -12,6 +12,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.launch
+
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
@@ -59,6 +63,9 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    private val _themeChangedEvent = MutableSharedFlow<Unit>() // Use for one-shot events
+    val themeChangedEvent = _themeChangedEvent.asSharedFlow()
+
     fun toggleDarkTheme() {
         val newValue = !_uiState.value.isDarkTheme
         _uiState.update { it.copy(isDarkTheme = newValue) }
@@ -71,6 +78,12 @@ class SettingsViewModel @Inject constructor(
         } else {
             AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
         }
+
+        // Emit an event to notify the Activity
+        viewModelScope.launch {
+            _themeChangedEvent.emit(Unit)
+        }
+
     }
 
     fun toggleAppLock() {

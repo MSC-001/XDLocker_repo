@@ -1,32 +1,34 @@
 package com.example.xdlocker
 
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.rememberNavController
 import com.example.xdlocker.navigation.AppNavigation
-import com.example.xdlocker.navigation.BackPressHandler
-import com.example.xdlocker.navigation.rememberNavigationState
 import com.example.xdlocker.ui.theme.XDLockerTheme
+import com.example.xdlocker.viewmodel.SettingsViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.delay
-import android.util.Log
-import com.example.xdlocker.viewmodel.SettingsViewModel
-import androidx.hilt.navigation.compose.hiltViewModel
 import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    // Get a reference to the ViewModel at the Activity level
+    private val settingsViewModel: SettingsViewModel by viewModels()
 
     private var isAppLocked = false
     private var splashScreenVisible = true
@@ -42,13 +44,19 @@ class MainActivity : ComponentActivity() {
 
         enableEdgeToEdge()
         setContent {
-            XDLockerApp()
+            XDLockerApp(settingsViewModel = settingsViewModel) // Pass the activity's instance
         }
 
         // Hide splash screen after delay
         lifecycleScope.launch {
             delay(1500) // Show splash for 1.5 seconds
             splashScreenVisible = false
+        }
+        lifecycleScope.launch {
+            settingsViewModel.themeChangedEvent.collect {
+                Log.d("MainActivityTheme", "Theme change event received, attempting to recreate Activity.") // ADD THIS LINE
+                recreate() // This will recreate the Activity
+            }
         }
     }
 
@@ -77,10 +85,10 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun XDLockerApp(
-    settingsViewModel: SettingsViewModel = hiltViewModel()
+    settingsViewModel: SettingsViewModel
 ) {
     val navController = rememberNavController()
-    val navigationState = rememberNavigationState(navController)
+    //val navigationState = rememberNavigationState(navController)
     val context = LocalContext.current
     val uiState by settingsViewModel.uiState.collectAsState()
 
@@ -97,7 +105,10 @@ fun XDLockerApp(
             modifier = Modifier.fillMaxSize(),
             color = MaterialTheme.colorScheme.background
         ) {
-            AppNavigation(navController = navController)
+            AppNavigation(
+                navController = navController,
+                settingsViewModel = settingsViewModel // This should already be there
+            )
         }
     }
 }

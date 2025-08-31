@@ -14,15 +14,17 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.xdlocker.data.entities.UserDatabaseInfo
 import com.example.xdlocker.ui.screens.*
+import com.example.xdlocker.viewmodel.SettingsViewModel
 
 @Composable
 fun AppNavigation(
     navController: NavHostController = rememberNavController(),
-    startDestination: String = NavigationRoutes.DATABASE_LIST
+    startDestination: String = NavigationRoutes.DATABASE_LIST,
+    settingsViewModel: SettingsViewModel // Added this parameter
 ) {
     NavHost(
         navController = navController,
-        startDestination = startDestination
+        startDestination = startDestination,
     ) {
         // Database List Screen
         composable(NavigationRoutes.DATABASE_LIST) {
@@ -138,12 +140,9 @@ fun AppNavigation(
         // Settings Screen
         composable(NavigationRoutes.SETTINGS) {
             SettingsScreen(
-                onNavigateBack = {
-                    navController.popBackStack()
-                },
-                onNavigateToAppLockSetup = {
-                    navController.navigate(NavigationRoutes.APP_LOCK_SETUP)
-                }
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToAppLockSetup = { navController.navigate(NavigationRoutes.APP_LOCK_SETUP) },
+                viewModel = settingsViewModel // <--- PASS THE VIEWMODEL HERE
             )
         }
 
