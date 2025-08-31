@@ -156,6 +156,33 @@ class MetadataRepository @Inject constructor(
     }
 
     /**
+     * Validates the password for an existing database without keeping it open.
+     */
+    suspend fun validatePasswordForExistingDatabase(
+        databaseInfo: UserDatabaseInfo,
+        password: String
+    ): Result<Unit> {
+        return try {
+            val openResult = databaseManager.openPasswordDatabase(databaseInfo, password)
+            openResult.fold(
+                onSuccess = { connection ->
+                    // Password is valid, connection was successful.
+                    // Close it immediately as we only wanted to validate.
+                    databaseManager.closePasswordDatabase(connection.filename)
+                    Result.success(Unit)
+                },
+                onFailure = { exception ->
+                    // openPasswordDatabase already returns Result.failure with appropriate exception
+                    Result.failure(exception)
+                }
+            )
+        } catch (e: Exception) {
+            // Catch any other unexpected errors during the process
+            Result.failure(e)
+        }
+    }
+
+    /**
      * Updates database metadata
      */
     suspend fun updateDatabase(databaseInfo: UserDatabaseInfo): Result<Unit> {

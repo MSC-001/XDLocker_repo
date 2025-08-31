@@ -7,9 +7,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -36,6 +38,24 @@ fun DatabaseListScreen(
     var selectedDatabase by remember { mutableStateOf<UserDatabaseInfo?>(null) }
     var showPasswordDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var showRenameDialog by remember { mutableStateOf(false) }
+    var databaseToRename by remember { mutableStateOf<UserDatabaseInfo?>(null) }
+
+    LaunchedEffect(uiState.showRenameSuccess) {
+        if (uiState.showRenameSuccess) {
+            showRenameDialog = false
+            databaseToRename = null
+            viewModel.clearSuccessMessages() // Make sure this function exists in ViewModel
+        }
+    }
+    
+    // Clear error when dialogs are dismissed (good practice)
+    LaunchedEffect(showDeleteDialog, showRenameDialog) {
+        if (!showDeleteDialog && !showRenameDialog) {
+            viewModel.clearError()
+        }
+    }
+
 
     Scaffold(
         topBar = {
@@ -120,11 +140,11 @@ fun DatabaseListScreen(
 
             // Content
             when {
-                uiState.isLoading -> {
+                uiState.isLoading && databases.isEmpty() -> { // Show loading only if databases are empty initially
                     LoadingContent()
                 }
 
-                databases.isEmpty() -> {
+                databases.isEmpty() && searchQuery.isBlank() -> { // Show empty state only if no search query
                     EmptyStateContent(
                         onCreateDatabase = onNavigateToCreateDatabase
                     )
@@ -136,6 +156,11 @@ fun DatabaseListScreen(
                         onDatabaseClick = { database ->
                             selectedDatabase = database
                             showPasswordDialog = true
+                        },
+                        onDatabaseEdit = { databaseInfo -> // 'databaseInfo' is the UserDatabaseInfo to be edited
+                            databaseToRename = databaseInfo
+                            showRenameDialog = true
+                            viewModel.clearError() // Clear error on edit
                         },
                         onDatabaseDelete = { database ->
                             selectedDatabase = database
@@ -154,7 +179,8 @@ fun DatabaseListScreen(
             database = selectedDatabase!!,
             onPasswordConfirmed = { password ->
                 // Here we would validate password and navigate
-                onNavigateToPasswordList(selectedDatabase!!)
+                // For now, let's assume password validation is handled before navigation or by the target screen
+                onNavigateToPasswordList(selectedDatabase!!) // TODO: Add password validation step if needed here
                 showPasswordDialog = false
                 selectedDatabase = null
             },
@@ -170,17 +196,156 @@ fun DatabaseListScreen(
             database = selectedDatabase!!,
             onConfirm = { password ->
                 viewModel.deleteDatabase(selectedDatabase!!, password)
+                // Dialog dismissal is handled by LaunchedEffect on uiState.showDeleteSuccess if implemented
+                // For now, dismiss directly
                 showDeleteDialog = false
                 selectedDatabase = null
             },
             onDismiss = {
                 showDeleteDialog = false
                 selectedDatabase = null
+                viewModel.clearError() // Clear error on dismiss
             },
-            isLoading = uiState.isDeleting
+            isLoading = uiState.isDeleting,
+            errorMessage = uiState.error // Pass error to dialog
+        )
+    }
+
+    if (showRenameDialog && databaseToRename != null) {
+        RenameDatabaseDialog(
+            database = databaseToRename!!,
+            onConfirm = { newLabel, password ->
+                viewModel.renameDatabase(databaseToRename!!, newLabel, password)
+                // Dialog dismissal and error clearing is handled by LaunchedEffect
+            },
+            onDismiss = {
+                showRenameDialog = false
+                databaseToRename = null
+                viewModel.clearError() // Clear error on dismiss
+            },
+            isLoading = uiState.isLoading, // Use general isLoading or add specific isRenaming
+            errorMessage = uiState.error
         )
     }
 }
+
+@Composable
+private fun RenameDatabaseDialog(
+    database: UserDatabaseInfo,
+    onConfirm: (String, String) -> Unit,
+    onDismiss: () -> Unit,
+    isLoading: Boolean,
+    errorMessage: String?
+) {
+    var newLabel by rememberSaveable(database.databaseLabel) { mutableStateOf(database.databaseLabel) }
+    var password by rememberSaveable { mutableStateOf("") }
+    var labelError by remember { mutableStateOf<String?>(null) }
+    var passwordError by remember { mutableStateOf<String?>(null) }
+
+    // Display ViewModel error related to label if it's not a password error
+    val currentLabelError = errorMessage?.takeIf { !it.contains("password", ignoreCase = true) }
+    // Display ViewModel error related to password
+    val currentPasswordError = errorMessage?.takeIf { it.contains("password", ignoreCase = true) }
+
+
+    AlertDialog(
+        onDismissRequest = { if (!isLoading) onDismiss() },
+        title = { Text("Rename Database") },
+        text = {
+            Column {
+                Text("Renaming \"${database.databaseLabel}\".")
+                Spacer(modifier = Modifier.height(16.dp))
+                OutlinedTextField(
+                    value = newLabel,
+                    onValueChange = {
+                        newLabel = it
+                        labelError = null // Clear local error on change
+                    },
+                    label = { Text("New database name") },
+                    singleLine = true,
+                    isError = labelError != null || currentLabelError != null,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                labelError?.let {
+                    Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                }
+                currentLabelError?.let {
+                    Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+                PasswordTextField(
+                    value = password,
+                    onValueChange = {
+                        password = it
+                        passwordError = null
+                    },
+                    label = "Current Password",
+                    isError = passwordError != null || currentPasswordError != null,
+                    imeAction = ImeAction.Done,
+                    onImeAction = {
+                        // Basic validation before trying to confirm via IME action
+                        if (newLabel.isNotBlank() && newLabel != database.databaseLabel && password.isNotBlank()) {
+                            onConfirm(newLabel, password)
+                        } else if (newLabel.isBlank()){
+                            labelError = "Name cannot be empty"
+                        } else if (newLabel == database.databaseLabel) {
+                            labelError = "Please enter a different name"
+                        } else if (password.isBlank()) {
+                            passwordError = "Password is required"
+                        }
+                    }
+                )
+                passwordError?.let {
+                    Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                }
+                currentPasswordError?.let {
+                    Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    var isValid = true
+                    if (newLabel.isBlank()) {
+                        labelError = "Name cannot be empty"
+                        isValid = false
+                    }
+                    // Allow renaming to the same name if it's just a case change,
+                    // but the backend (DatabaseManager) will check for actual conflicts.
+                    // For UI, primary validation is non-empty and required password.
+                    // Backend handles if newLabel == database.databaseLabel (no actual change)
+                    // or if newLabel conflicts with another existing DB.
+
+                    if (password.isBlank()) {
+                        passwordError = "Password is required"
+                        isValid = false
+                    }
+                    if (isValid) {
+                        onConfirm(newLabel, password)
+                    }
+                },
+                enabled = !isLoading
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(modifier = Modifier.size(ButtonDefaults.IconSize))
+                } else {
+                    Text("Rename")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                enabled = !isLoading
+            ) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
 
 @Composable
 private fun StatsOverviewCard(
@@ -199,7 +364,7 @@ private fun StatsOverviewCard(
                 label = "Databases",
                 icon = Icons.Default.Storage
             )
-            VerticalDivider(modifier = Modifier.height(48.dp))
+            VerticalDivider(modifier = Modifier.height(48.dp)) // Ensure this is Material 3 Divider
             StatColumn(
                 value = totalEntries.toString(),
                 label = "Total Entries",
@@ -270,17 +435,18 @@ private fun EmptyStateContent(
 private fun DatabaseListContent(
     databases: List<UserDatabaseInfo>,
     onDatabaseClick: (UserDatabaseInfo) -> Unit,
+    onDatabaseEdit: (UserDatabaseInfo) -> Unit, // Added this parameter
     onDatabaseDelete: (UserDatabaseInfo) -> Unit,
     getDatabaseSize: (String) -> String
 ) {
     LazyColumn(
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        items(databases) { database ->
+        items(databases, key = { it.id }) { database -> // Added key for better performance
             DatabaseCard(
                 database = database,
                 onClick = { onDatabaseClick(database) },
-                onEdit = { /* Handle edit */ },
+                onEdit = { onDatabaseEdit(database) }, // Use the passed lambda
                 onDelete = { onDatabaseDelete(database) }
             )
         }
@@ -327,7 +493,7 @@ private fun DatabasePasswordDialog(
     onPasswordConfirmed: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var password by remember { mutableStateOf("") }
+    var password by rememberSaveable { mutableStateOf("") } // Use rememberSaveable
     var isError by remember { mutableStateOf(false) }
 
     AlertDialog(
@@ -345,7 +511,7 @@ private fun DatabasePasswordDialog(
                     },
                     label = "Password",
                     isError = isError,
-                    errorMessage = if (isError) "Invalid password" else null,
+                    // errorMessage = if (isError) "Invalid password" else null, // Let ViewModel handle error messages
                     imeAction = androidx.compose.ui.text.input.ImeAction.Done,
                     onImeAction = {
                         if (password.isNotBlank()) {
@@ -361,7 +527,7 @@ private fun DatabasePasswordDialog(
                     if (password.isNotBlank()) {
                         onPasswordConfirmed(password)
                     } else {
-                        isError = true
+                        isError = true // Minimal local validation
                     }
                 },
                 enabled = password.isNotBlank()
@@ -382,13 +548,17 @@ private fun DeleteDatabaseDialog(
     database: UserDatabaseInfo,
     onConfirm: (String) -> Unit,
     onDismiss: () -> Unit,
-    isLoading: Boolean
+    isLoading: Boolean,
+    errorMessage: String? // Added to display errors from ViewModel
 ) {
-    var password by remember { mutableStateOf("") }
-    var isError by remember { mutableStateOf(false) }
+    var password by rememberSaveable { mutableStateOf("") }
+    var passwordError by remember { mutableStateOf<String?>(null) } // Local error for password field
+
+    val currentPasswordError = errorMessage?.takeIf { it.contains("password", ignoreCase = true) } 
+                                ?: passwordError // Combine VM error with local error
 
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = {if (!isLoading) onDismiss()},
         title = { Text("Delete Database") },
         text = {
             Column {
@@ -404,11 +574,11 @@ private fun DeleteDatabaseDialog(
                     value = password,
                     onValueChange = {
                         password = it
-                        isError = false
+                        passwordError = null // Clear local error on change
                     },
                     label = "Enter password to confirm",
-                    isError = isError,
-                    errorMessage = if (isError) "Password required" else null
+                    isError = currentPasswordError != null,
+                    errorMessage = currentPasswordError
                 )
             }
         },
@@ -418,7 +588,7 @@ private fun DeleteDatabaseDialog(
                     if (password.isNotBlank()) {
                         onConfirm(password)
                     } else {
-                        isError = true
+                        passwordError = "Password is required" // Set local error
                     }
                 },
                 enabled = password.isNotBlank() && !isLoading,
@@ -428,7 +598,7 @@ private fun DeleteDatabaseDialog(
             ) {
                 if (isLoading) {
                     CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
+                        modifier = Modifier.size(ButtonDefaults.IconSize), // Use standard size
                         color = MaterialTheme.colorScheme.onError
                     )
                 } else {

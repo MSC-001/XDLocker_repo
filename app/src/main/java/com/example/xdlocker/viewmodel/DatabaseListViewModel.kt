@@ -74,7 +74,6 @@ class DatabaseListViewModel @Inject constructor(
         )
 
     init {
-        // Load initial data
         refreshDatabases()
     }
 
@@ -87,26 +86,29 @@ class DatabaseListViewModel @Inject constructor(
     }
 
     fun refreshDatabases() {
-        _uiState.update { it.copy(isLoading = true, error = null) }
+        _uiState.update { currentState ->
+            val newState: DatabaseListUiState = currentState.copy(isLoading = true, error = null)
+            newState
+        }
         // The databases flow will automatically update
-        _uiState.update { it.copy(isLoading = false) }
+        _uiState.update { currentState ->
+            val newState: DatabaseListUiState = currentState.copy(isLoading = false)
+            newState
+        }
     }
 
     fun deleteDatabase(database: UserDatabaseInfo, password: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isDeleting = true, error = null) }
 
-            // First validate password by trying to open the database
-            val openResult = metadataRepository.createDatabase(
-                database.databaseLabel + "_temp_validation",
-                password
-            )
+            // First validate password for the existing database
+            val validationResult = metadataRepository.validatePasswordForExistingDatabase(database, password)
 
-            if (openResult.isFailure) {
+            if (validationResult.isFailure) {
                 _uiState.update {
                     it.copy(
                         isDeleting = false,
-                        error = "Invalid password"
+                        error = validationResult.exceptionOrNull()?.message ?: "Invalid password or failed to validate."
                     )
                 }
                 return@launch
@@ -148,6 +150,7 @@ class DatabaseListViewModel @Inject constructor(
                             showRenameSuccess = true
                         )
                     }
+                    refreshDatabases()
                 },
                 onFailure = { error ->
                     _uiState.update {
