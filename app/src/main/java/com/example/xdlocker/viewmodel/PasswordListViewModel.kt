@@ -50,7 +50,7 @@ class PasswordListViewModel @Inject constructor(
     ) { query, tag, sort, favoritesOnly ->
         databaseFilename?.let { filename ->
             passwordRepository.getAllEntries(filename)
-                .filterByQuery(query)
+                .filterEntriesByQuery(query)
                 .filterByTag(tag)
                 .filterFavorites(favoritesOnly)
                 .sortBy(sort)
@@ -213,10 +213,7 @@ class PasswordListViewModel @Inject constructor(
     }
 
     fun getEntryById(entryId: Int): PasswordEntry? {
-        return databaseFilename?.let { filename ->
-            // This should be handled by the UI layer with a suspend function
-            null
-        }
+        return null
     }
 
     fun refreshEntries() {

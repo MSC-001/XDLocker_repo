@@ -1,5 +1,6 @@
 package com.example.xdlocker.data.database
 
+import android.annotation.SuppressLint
 import android.content.Context
 import com.example.xdlocker.data.dao.UserDatabaseInfoDao
 import com.example.xdlocker.data.entities.UserDatabaseInfo
@@ -22,6 +23,7 @@ class DatabaseManager private constructor(private val context: Context) {
     private val databaseMutex = Mutex()
 
     companion object {
+        @SuppressLint("StaticFieldLeak")
         @Volatile
         private var INSTANCE: DatabaseManager? = null
 

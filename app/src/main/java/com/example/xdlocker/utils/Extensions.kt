@@ -3,7 +3,9 @@ package com.example.xdlocker.utils
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.pm.PackageManager
+import android.os.Build
 import android.widget.Toast
+import androidx.annotation.RequiresApi
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.platform.LocalContext
@@ -87,6 +89,7 @@ fun Context.getAppVersion(): String {
     }
 }
 
+@RequiresApi(Build.VERSION_CODES.P)
 fun Context.getAppVersionCode(): Long {
     return try {
         val packageInfo = packageManager.getPackageInfo(packageName, 0)
@@ -222,9 +225,7 @@ object SecurityUtils {
         if (includeSymbols) chars += Constants.PasswordChars.SYMBOLS
 
         if (excludeSimilar) {
-            chars = chars.filterNot { Constants.PasswordChars.SIMILAR_CHARS.contains(it) }
-                .joinToString("")
-        }
+            chars = chars.filterNot { Constants.PasswordChars.SIMILAR_CHARS.contains(it)}}
 
         if (chars.isEmpty()) return ""
 

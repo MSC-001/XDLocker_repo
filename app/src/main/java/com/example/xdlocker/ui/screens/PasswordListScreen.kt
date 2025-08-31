@@ -5,6 +5,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -35,8 +37,8 @@ fun PasswordListScreen(
     val passwordEntries by viewModel.passwordEntries.collectAsStateWithLifecycle()
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val selectedTag by viewModel.selectedTag.collectAsStateWithLifecycle()
-    val availableTags by viewModel.availableTags.collectAsStateWithLifecycle()
-    val showFavoritesOnly by viewModel.showFavoritesOnly.collectAsStateWithLifecycle()
+    val availableTags by viewModel.availableTags.collectAsStateWithLifecycle(initialValue = emptyList()) // Added initialValue
+    val showFavoritesOnly by viewModel.showFavoritesOnly.collectAsStateWithLifecycle(initialValue = false) // Added initialValue
 
     var showSortMenu by remember { mutableStateOf(false) }
     var showPasswordDialog by remember { mutableStateOf(!uiState.isDatabaseOpen) }
@@ -63,12 +65,12 @@ fun PasswordListScreen(
                         viewModel.closeDatabase()
                         onNavigateBack()
                     }) {
-                        Icon(Icons.Default.ArrowBack, "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
                     }
                 },
                 actions = {
                     IconButton(onClick = { showSortMenu = true }) {
-                        Icon(Icons.Default.Sort, "Sort")
+                        Icon(Icons.AutoMirrored.Filled.Sort, "Sort")
                     }
 
                     IconButton(onClick = viewModel::toggleShowFavoritesOnly) {
@@ -84,7 +86,7 @@ fun PasswordListScreen(
                         expanded = showSortMenu,
                         onDismissRequest = { showSortMenu = false }
                     ) {
-                        SortCriteria.values().forEach { criteria ->
+                        SortCriteria.entries.forEach { criteria ->
                             DropdownMenuItem(
                                 text = { Text(getSortDisplayName(criteria)) },
                                 onClick = {

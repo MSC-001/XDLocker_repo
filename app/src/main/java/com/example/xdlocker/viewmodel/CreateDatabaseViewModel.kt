@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.xdlocker.data.entities.UserDatabaseInfo
 import com.example.xdlocker.data.repository.MetadataRepository
 import com.example.xdlocker.utils.PasswordUtils
+import com.example.xdlocker.utils.Constants
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -147,6 +148,71 @@ class CreateDatabaseViewModel @Inject constructor(
 
     // Password strength calculation moved to PasswordUtils class
 
+    fun generatePassword() {
+        val currentState = _uiState.value // Get current UI state for generation options
+
+        // Determine the character pool using Constants.PasswordChars
+        var charPool = ""
+        if (currentState.passwordGenIncludeUppercase) { // Assumed UiState field name
+            charPool += Constants.PasswordChars.UPPERCASE
+        }
+        if (currentState.passwordGenIncludeLowercase) { // Assumed UiState field name
+            charPool += Constants.PasswordChars.LOWERCASE
+        }
+        if (currentState.passwordGenIncludeNumbers) { // Assumed UiState field name
+            charPool += Constants.PasswordChars.NUMBERS
+        }
+        if (currentState.passwordGenIncludeSymbols) { // Assumed UiState field name
+            charPool += Constants.PasswordChars.SYMBOLS
+        }
+
+        // Exclude similar characters if requested and the pool is not empty
+        if (currentState.passwordGenExcludeSimilar && charPool.isNotEmpty()) { // Assumed UiState field name
+            charPool = charPool.filterNot { Constants.PasswordChars.SIMILAR_CHARS.contains(it) }
+        }
+
+        // Handle case where no character sets result in an empty pool
+        if (charPool.isEmpty()) {
+            _uiState.update {
+                it.copy(
+                    password = "", // Clear password
+                    // Optionally, set an error message in UiState to inform the user
+                    // passwordError = "Please select character types for password generation."
+                )
+            }
+            // It's important to also trigger onPasswordChanged if you want UI to update based on passwordError
+            onPasswordChanged("") // Pass empty string to trigger validation/strength update for the empty state
+            return
+        }
+
+        // Determine the length to use from UiState, falling back to default and respecting min/max from Constants
+        // Assuming passwordGenLength in UiState could be null or not yet set by the dialog
+        val desiredLength = currentState.passwordGenLength ?: Constants.DEFAULT_PASSWORD_LENGTH // Assumed UiState & Constant names
+
+        val lengthToUse = desiredLength.coerceIn(
+            Constants.MIN_PASSWORD_GEN_LENGTH, // Assumed Constant name
+            Constants.MAX_PASSWORD_GEN_LENGTH  // Assumed Constant name
+        )
+
+        // Generate the password
+        val newPassword = (1..lengthToUse)
+            .map { charPool.random() }
+            .joinToString("")
+
+        // Update the UI state with the new password
+        _uiState.update {
+            it.copy(
+                password = newPassword,
+                confirmPassword = "", // Clear confirm password field when a new password is generated
+                passwordError = null, // Clear any previous password errors
+                confirmPasswordError = null // Clear confirm password errors
+                // Note: passwordStrength will be updated by the onPasswordChanged call below
+            )
+        }
+        // Call existing onPasswordChanged to trigger validation and password strength calculation
+        onPasswordChanged(newPassword)
+    }
+
     fun clearError() {
         _uiState.update { it.copy(error = null) }
     }
@@ -169,7 +235,12 @@ data class CreateDatabaseUiState(
     val passwordError: String? = null,
     val confirmPasswordError: String? = null,
     val error: String? = null,
-    val passwordStrength: PasswordUtils.PasswordStrength = PasswordUtils.PasswordStrength(0, "")
+    val passwordStrength: PasswordUtils.PasswordStrength = PasswordUtils.PasswordStrength(0, ""),
+    // Added password generation fields
+    val passwordGenLength: Int = Constants.DEFAULT_PASSWORD_LENGTH,
+    val passwordGenIncludeUppercase: Boolean = true,
+    val passwordGenIncludeLowercase: Boolean = true,
+    val passwordGenIncludeNumbers: Boolean = true,
+    val passwordGenIncludeSymbols: Boolean = true,
+    val passwordGenExcludeSimilar: Boolean = true
 )
-
-// PasswordStrength class moved to utils.PasswordUtils

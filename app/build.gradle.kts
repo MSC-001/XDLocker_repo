@@ -72,8 +72,8 @@ dependencies {
     implementation(libs.androidx.ui)
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
+    debugImplementation(libs.androidx.ui.tooling)
     implementation(libs.androidx.material3)
-
     // Compose Material Icons (For icon issues)
     implementation(libs.androidx.compose.material.icons.core)     // <<< For Icons
     implementation(libs.androidx.compose.material.icons.extended) // <<< For Icons
@@ -99,7 +99,9 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
 
     // ViewModel
+    implementation(libs.androidx.lifecycle.runtime.ktx) // Your existing version (e.g., 2.7.0)
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
 
     // Biometric Authentication
     implementation(libs.androidx.biometric)

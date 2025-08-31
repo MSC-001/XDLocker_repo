@@ -26,7 +26,7 @@ abstract class MetadataDatabase : RoomDatabase() {
 
         // Migration from version 1 to 2 (for future use)
         val MIGRATION_1_2 = object : Migration(1, 2) {
-            override fun migrate(database: SupportSQLiteDatabase) {
+            override fun migrate(db: SupportSQLiteDatabase) {
                 // Example migration
                 // database.execSQL("ALTER TABLE user_databases ADD COLUMN new_field TEXT DEFAULT ''")
             }
@@ -92,7 +92,7 @@ abstract class MetadataDatabase : RoomDatabase() {
         /**
          * Resets the metadata database (removes all data)
          */
-        suspend fun resetDatabase(context: Context) {
+        fun resetDatabase(context: Context) {
             val db = getDatabase(context)
             db.clearAllTables()
         }
@@ -102,7 +102,7 @@ abstract class MetadataDatabase : RoomDatabase() {
      * Callback for metadata database events
      */
     private class MetadataCallback : RoomDatabase.Callback() {
-        override fun onCreate(db: SupportSQLiteDatabase) {
+         override fun onCreate(db: SupportSQLiteDatabase) {
             super.onCreate(db)
             // Metadata database created
             // Could add default settings or initial data here
@@ -135,7 +135,7 @@ suspend fun <T> MetadataDatabase.safeOperation(operation: suspend () -> T): Resu
  */
 fun MetadataDatabase.isAccessible(): Boolean {
     return try {
-        this.isOpen && this.openHelper.readableDatabase != null
+        this.isOpen
     } catch (e: Exception) {
         false
     }

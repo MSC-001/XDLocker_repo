@@ -50,7 +50,7 @@ fun Flow<List<PasswordEntry>>.sortBy(criteria: SortCriteria): Flow<List<Password
     }
 }
 
-fun Flow<List<PasswordEntry>>.filterByQuery(query: String): Flow<List<PasswordEntry>> {
+fun Flow<List<PasswordEntry>>.filterEntriesByQuery(query: String): Flow<List<PasswordEntry>> {
     return this.map { entries ->
         if (query.isBlank()) {
             entries
@@ -139,7 +139,7 @@ fun Flow<List<UserDatabaseInfo>>.sortBy(criteria: DatabaseSortCriteria): Flow<Li
     }
 }
 
-fun Flow<List<UserDatabaseInfo>>.filterByQuery(query: String): Flow<List<UserDatabaseInfo>> {
+fun Flow<List<UserDatabaseInfo>>.filterDatabasesByQuery(query: String): Flow<List<UserDatabaseInfo>> {
     return this.map { databases ->
         if (query.isBlank()) {
             databases

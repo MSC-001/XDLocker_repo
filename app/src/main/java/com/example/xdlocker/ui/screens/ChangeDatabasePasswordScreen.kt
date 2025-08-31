@@ -47,14 +47,13 @@ fun ChangeDatabasePasswordScreen(
         PasswordUtils.calculatePasswordStrength(newPassword)
     }
     
-    // Ensure we have access to the strength properties
+    // Define a local data class to hold password strength results
     data class PasswordStrengthResult(val score: Int, val label: String)
     val passwordStrengthData = remember(passwordStrength) {
         PasswordStrengthResult(passwordStrength.score, passwordStrength.label)
     }
 
-    // Define a local data class to hold password strength results if needed
-    data class PasswordStrengthResult(val score: Int, val label: String)
+    // REMOVED duplicate: data class PasswordStrengthResult(val score: Int, val label: String)
 
     fun validateInputs(): Boolean {
         oldPasswordError = null
@@ -74,7 +73,7 @@ fun ChangeDatabasePasswordScreen(
         } else if (newPassword.length < 6) {
             newPasswordError = "Password must be at least 6 characters"
             isValid = false
-        } else if (passwordStrengthData.score < 30) {
+        } else if (passwordStrengthData.score < 30) { // Assuming score 30 is a minimum threshold
             newPasswordError = "Password is too weak"
             isValid = false
         }

@@ -240,7 +240,7 @@ class AddEditPasswordViewModel @Inject constructor(
         if (includeSymbols) chars += symbols
 
         if (excludeSimilar) {
-            chars = chars.filterNot { similar.contains(it) }.joinToString("")
+            chars = chars.filterNot { similar.contains(it) } // Reverted line
         }
 
         if (chars.isEmpty()) return ""
