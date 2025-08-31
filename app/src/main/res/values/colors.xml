@@ -59,12 +59,4 @@
     <color name="warning_color">#FF9800</color>
     <color name="info_color">#2196F3</color>
 
-    <!-- Dark Theme Colors -->
-    <color name="dark_background">#121212</color>
-    <color name="dark_surface">#1E1E1E</color>
-    <color name="dark_surface_variant">#2C2C2C</color>
-    <color name="dark_on_surface">#E0E0E0</color>
-    <color name="dark_on_surface_variant">#BDBDBD</color>
-    <color name="dark_outline">#616161</color>
-
 </resources>

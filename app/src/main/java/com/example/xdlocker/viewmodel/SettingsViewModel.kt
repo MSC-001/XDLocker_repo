@@ -1,9 +1,12 @@
 package com.example.xdlocker.viewmodel
 
+import android.content.Context
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.xdlocker.data.repository.MetadataRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -12,26 +15,46 @@ import javax.inject.Inject
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
-    private val metadataRepository: MetadataRepository
+    private val metadataRepository: MetadataRepository,
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState = _uiState.asStateFlow()
+
+    companion object {
+        private const val APP_SETTINGS_PREFS = "app_settings_prefs"
+    }
 
     init {
         loadSettings()
     }
 
     private fun loadSettings() {
-        // Load saved preferences from SharedPreferences or DataStore
+        // --- Dark Theme ---
+        val isDarkThemeEnabled = getPreference("dark_theme", false) as? Boolean ?: false
+        if (isDarkThemeEnabled) {
+            AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
+        } else {
+            AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
+        }
+
+        // --- Other Settings (load them similarly) ---
+        val isAppLockEnabled = getPreference("app_lock_enabled", false) as? Boolean ?: false
+        val isBiometricEnabled = getPreference("biometric_enabled", false) as? Boolean ?: false
+        // Ensure biometric is off if app lock is off, even if preference says otherwise
+        val actualBiometricEnabled = if (isAppLockEnabled) isBiometricEnabled else false
+
+        val autoLockTimeoutMinutes = getPreference("auto_lock_timeout", 5) as? Int ?: 5
+        val defaultSortOrder = getPreference("default_sort_order", "Title (A-Z)") as? String ?: "Title (A-Z)"
+
         _uiState.update {
             it.copy(
-                // These would be loaded from actual preferences
-                isDarkTheme = false, // Load from preferences
-                isAppLockEnabled = false, // Load from preferences
-                isBiometricEnabled = false, // Load from preferences
-                autoLockTimeoutMinutes = 5, // Load from preferences
-                defaultSortOrder = "Title (A-Z)" // Load from preferences
+                isDarkTheme = isDarkThemeEnabled,
+                isAppLockEnabled = isAppLockEnabled,
+                isBiometricEnabled = actualBiometricEnabled,
+                autoLockTimeoutMinutes = autoLockTimeoutMinutes,
+                defaultSortOrder = defaultSortOrder
             )
         }
     }
@@ -41,6 +64,13 @@ class SettingsViewModel @Inject constructor(
         _uiState.update { it.copy(isDarkTheme = newValue) }
         // Save to preferences
         savePreference("dark_theme", newValue)
+
+        // Apply the theme change
+        if (newValue) {
+            AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
+        } else {
+            AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
+        }
     }
 
     fun toggleAppLock() {
@@ -300,10 +330,32 @@ class SettingsViewModel @Inject constructor(
     }
 
     private fun savePreference(key: String, value: Any) {
-        // Save to SharedPreferences or DataStore
-        // Implementation would use actual preference storage
+        val prefs = context.getSharedPreferences(APP_SETTINGS_PREFS, Context.MODE_PRIVATE)
+        with(prefs.edit()) {
+            when (value) {
+                is Boolean -> putBoolean(key, value)
+                is Int -> putInt(key, value)
+                is String -> putString(key, value)
+                is Float -> putFloat(key, value)
+                is Long -> putLong(key, value)
+                else -> throw IllegalArgumentException("Unsupported preference type for key: $key")
+            }
+            apply()
+        }
     }
 
+    private fun getPreference(key: String, defaultValue: Any): Any {
+        val prefs = context.getSharedPreferences(APP_SETTINGS_PREFS, Context.MODE_PRIVATE)
+        return when (defaultValue) {
+            is Boolean -> prefs.getBoolean(key, defaultValue)
+            is Int -> prefs.getInt(key, defaultValue)
+            is String -> prefs.getString(key, defaultValue) ?: defaultValue
+            is Float -> prefs.getFloat(key, defaultValue)
+            is Long -> prefs.getLong(key, defaultValue)
+            else -> throw IllegalArgumentException("Unsupported preference type for key: $key")
+        }
+    }
+    
     fun clearError() {
         _uiState.update { it.copy(error = null) }
     }

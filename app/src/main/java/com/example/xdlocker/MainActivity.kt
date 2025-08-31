@@ -20,6 +20,9 @@ import com.example.xdlocker.navigation.rememberNavigationState
 import com.example.xdlocker.ui.theme.XDLockerTheme
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.delay
+import android.util.Log
+import com.example.xdlocker.viewmodel.SettingsViewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
@@ -38,7 +41,6 @@ class MainActivity : ComponentActivity() {
         splashScreen.setKeepOnScreenCondition { splashScreenVisible }
 
         enableEdgeToEdge()
-
         setContent {
             XDLockerApp()
         }
@@ -74,23 +76,23 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun XDLockerApp() {
+fun XDLockerApp(
+    settingsViewModel: SettingsViewModel = hiltViewModel()
+) {
     val navController = rememberNavController()
     val navigationState = rememberNavigationState(navController)
     val context = LocalContext.current
+    val uiState by settingsViewModel.uiState.collectAsState()
 
-    // Handle system back button
-    BackHandler {
-        BackPressHandler.handleBackPress(
-            navController = navController,
-            currentRoute = navigationState.currentRoute,
-            onExitApp = {
-                (context as? ComponentActivity)?.finish()
-            }
-        )
-    }
+    Log.d("XDLockerAppTheme", "uiState.isDarkTheme from ViewModel: ${uiState.isDarkTheme}") // Log ViewModel state
 
-    XDLockerTheme {
+    XDLockerTheme(darkTheme = uiState.isDarkTheme) {
+        // Log the background color that MaterialTheme is providing
+        Log.d("XDLockerAppTheme", "MaterialTheme.colorScheme.background: ${MaterialTheme.colorScheme.background}")
+        Log.d("XDLockerAppTheme", "MaterialTheme.colorScheme.surface: ${MaterialTheme.colorScheme.surface}")
+        Log.d("XDLockerAppTheme", "MaterialTheme.colorScheme.primary: ${MaterialTheme.colorScheme.primary}")
+
+
         Surface(
             modifier = Modifier.fillMaxSize(),
             color = MaterialTheme.colorScheme.background
