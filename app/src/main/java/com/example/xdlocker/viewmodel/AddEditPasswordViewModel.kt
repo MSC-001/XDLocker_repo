@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.xdlocker.data.entities.PasswordEntry
 import com.example.xdlocker.data.repository.PasswordRepository
+import com.example.xdlocker.utils.PasswordUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -249,50 +250,8 @@ class AddEditPasswordViewModel @Inject constructor(
             .joinToString("")
     }
 
-    private fun calculatePasswordStrength(password: String): PasswordStrength {
-        if (password.isEmpty()) return PasswordStrength(0, "No Password")
-
-        var score = 0
-        val feedback = mutableListOf<String>()
-
-        // Length scoring
-        when {
-            password.length >= 16 -> { score += 25; feedback.add("Excellent length") }
-            password.length >= 12 -> { score += 20; feedback.add("Good length") }
-            password.length >= 8 -> { score += 15; feedback.add("Adequate length") }
-            password.length >= 6 -> { score += 10; feedback.add("Short") }
-            else -> feedback.add("Too short")
-        }
-
-        // Character variety
-        if (password.any { it.isLowerCase() }) { score += 5; feedback.add("Lowercase") }
-        if (password.any { it.isUpperCase() }) { score += 5; feedback.add("Uppercase") }
-        if (password.any { it.isDigit() }) { score += 5; feedback.add("Numbers") }
-        if (password.any { !it.isLetterOrDigit() }) { score += 10; feedback.add("Symbols") }
-
-        // Complexity bonus
-        val charTypes = listOf(
-            password.any { it.isLowerCase() },
-            password.any { it.isUpperCase() },
-            password.any { it.isDigit() },
-            password.any { !it.isLetterOrDigit() }
-        ).count { it }
-        score += charTypes * 10
-
-        // Penalties
-        if (password.contains("123") || password.contains("abc")) {
-            score -= 10; feedback.add("Avoid sequences")
-        }
-
-        val strength = when {
-            score >= 80 -> "Very Strong"
-            score >= 60 -> "Strong"
-            score >= 40 -> "Medium"
-            score >= 20 -> "Weak"
-            else -> "Very Weak"
-        }
-
-        return PasswordStrength(minOf(score, 100), strength)
+    private fun calculatePasswordStrength(password: String): PasswordUtils.PasswordStrength {
+        return PasswordUtils.calculatePasswordStrength(password)
     }
 
     fun clearError() {
@@ -320,23 +279,8 @@ data class AddEditPasswordUiState(
     val titleError: String? = null,
     val passwordError: String? = null,
     val error: String? = null,
-    val passwordStrength: PasswordStrength = PasswordStrength(0, "No Password"),
+    val passwordStrength: PasswordUtils.PasswordStrength = PasswordUtils.PasswordStrength(0, "No Password"),
     val showPasswordGenerated: Boolean = false
 )
 
-data class PasswordStrength(
-    val score: Int,
-    val label: String
-) {
-    val color: String
-        get() = when {
-            score >= 80 -> "green"
-            score >= 60 -> "blue"
-            score >= 40 -> "orange"
-            score >= 20 -> "red"
-            else -> "gray"
-        }
-
-    val progress: Float
-        get() = score / 100f
-}
+// PasswordStrength class is now imported from PasswordUtils

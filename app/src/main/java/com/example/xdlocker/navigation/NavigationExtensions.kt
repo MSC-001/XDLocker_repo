@@ -7,6 +7,12 @@ import androidx.navigation.NavGraph.Companion.findStartDestination
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 
+// Added imports for remember, mutableStateOf, getValue, setValue
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+
 /**
  * Navigation extension functions and utilities
  */
@@ -80,7 +86,8 @@ fun NavController.navigateBackOr(fallbackRoute: String) {
  * Check if a route is in the back stack
  */
 fun NavController.isRouteInBackStack(route: String): Boolean {
-    return backQueue.any { it.destination.route == route }
+    // Changed from backQueue to currentBackStack
+    return currentBackStack.value.any { it.destination.route == route }
 }
 
 /**
@@ -141,7 +148,7 @@ object DeepLinkHandler {
                 val databaseId = deepLink.substringAfterLast("/").toIntOrNull()
                 if (databaseId != null) {
                     // Navigate to specific database
-                    navController.navigate(NavigationRoutes.DATABASE_LIST)
+                    navController.navigate(NavigationRoutes.DATABASE_LIST) // Consider navigating to a specific DB screen
                 }
             }
 
@@ -210,7 +217,8 @@ fun rememberNavigationState(navController: NavController): NavigationState {
                 navigationState = NavigationState(
                     currentRoute = backStackEntry.destination.route,
                     canNavigateBack = navController.previousBackStackEntry != null,
-                    backStackEntryCount = navController.backQueue.size
+                    // Changed from backQueue.size to currentBackStack.value.size
+                    backStackEntryCount = navController.currentBackStack.value.size
                 )
             }
             .launchIn(this)

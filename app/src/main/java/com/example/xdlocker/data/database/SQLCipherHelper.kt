@@ -4,14 +4,14 @@ import android.content.Context
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
-import androidx.sqlite.db.SupportSQLiteOpenHelper
-import net.zetetic.database.sqlcipher.SupportFactory
+// import androidx.sqlite.db.SupportSQLiteOpenHelper // This import is not strictly necessary if not directly used.
+import net.sqlcipher.database.SupportFactory // <- UPDATED IMPORT
 
 object SQLCipherHelper {
 
-    /**
-     * Creates a SupportFactory for SQLCipher encryption
-     * @param password The encryption password for the database
+    /*
+     Creates a SupportFactory for SQLCipher encryption
+      //@param password The encryption password for the database
      */
     fun createSupportFactory(password: String): SupportFactory {
         val passphrase = password.toByteArray()
@@ -37,7 +37,10 @@ object SQLCipherHelper {
                 .build()
 
             // Try to perform a simple query
-            tempDb.passwordEntryDao().getEntryCount()
+            // Note: tempDb.passwordEntryDao().getEntryCount() was flagged as a suspend function call.
+            // This is a separate issue we should address if it persists after dependency fixes.
+            // For now, let's assume it works or will be fixed.
+            tempDb.query("SELECT COUNT(*) FROM password_entries", null) // A simple raw query
             tempDb.close()
             true
         } catch (e: Exception) {
@@ -69,7 +72,7 @@ object SQLCipherHelper {
                 .build()
 
             // Get writable database and change password
-            val writableDb = database.openHelper.writableDatabase
+            val writableDb = database.openHelper.writableDatabase // This is SupportSQLiteDatabase
             writableDb.execSQL("PRAGMA rekey = '${newPassword.replace("'", "''")}'")
 
             database.close()

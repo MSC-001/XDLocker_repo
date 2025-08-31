@@ -18,6 +18,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.xdlocker.ui.components.PasswordStrengthIndicator
 import com.example.xdlocker.ui.components.PasswordTextField
+import com.example.xdlocker.utils.PasswordUtils
 import com.example.xdlocker.viewmodel.SettingsViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -43,8 +44,17 @@ fun ChangeDatabasePasswordScreen(
 
     // Password strength calculation
     val passwordStrength = remember(newPassword) {
-        calculatePasswordStrength(newPassword)
+        PasswordUtils.calculatePasswordStrength(newPassword)
     }
+    
+    // Ensure we have access to the strength properties
+    data class PasswordStrengthResult(val score: Int, val label: String)
+    val passwordStrengthData = remember(passwordStrength) {
+        PasswordStrengthResult(passwordStrength.score, passwordStrength.label)
+    }
+
+    // Define a local data class to hold password strength results if needed
+    data class PasswordStrengthResult(val score: Int, val label: String)
 
     fun validateInputs(): Boolean {
         oldPasswordError = null
@@ -64,7 +74,7 @@ fun ChangeDatabasePasswordScreen(
         } else if (newPassword.length < 6) {
             newPasswordError = "Password must be at least 6 characters"
             isValid = false
-        } else if (passwordStrength.score < 30) {
+        } else if (passwordStrengthData.score < 30) {
             newPasswordError = "Password is too weak"
             isValid = false
         }
@@ -177,7 +187,7 @@ fun ChangeDatabasePasswordScreen(
                 showGenerateButton = true,
                 onGeneratePassword = {
                     // Generate secure password
-                    newPassword = generateSecurePassword()
+                    newPassword = PasswordUtils.generateSecurePassword()
                 },
                 modifier = Modifier.focusRequester(newPasswordFocusRequester)
             )
@@ -187,8 +197,8 @@ fun ChangeDatabasePasswordScreen(
             // Password strength
             if (newPassword.isNotBlank()) {
                 PasswordStrengthIndicator(
-                    strength = passwordStrength.score,
-                    label = passwordStrength.label
+                    strength = passwordStrengthData.score,
+                    label = passwordStrengthData.label
                 )
             }
 
@@ -291,57 +301,7 @@ fun ChangeDatabasePasswordScreen(
     }
 }
 
-// Helper function for password strength calculation
-private fun calculatePasswordStrength(password: String): PasswordStrength {
-    if (password.isEmpty()) return PasswordStrength(0, "No Password")
-
-    var score = 0
-
-    // Length scoring
-    when {
-        password.length >= 16 -> score += 25
-        password.length >= 12 -> score += 20
-        password.length >= 8 -> score += 15
-        password.length >= 6 -> score += 10
-    }
-
-    // Character variety
-    if (password.any { it.isLowerCase() }) score += 5
-    if (password.any { it.isUpperCase() }) score += 5
-    if (password.any { it.isDigit() }) score += 5
-    if (password.any { !it.isLetterOrDigit() }) score += 10
-
-    // Complexity bonus
-    val charTypes = listOf(
-        password.any { it.isLowerCase() },
-        password.any { it.isUpperCase() },
-        password.any { it.isDigit() },
-        password.any { !it.isLetterOrDigit() }
-    ).count { it }
-    score += charTypes * 10
-
-    val strength = when {
-        score >= 80 -> "Very Strong"
-        score >= 60 -> "Strong"
-        score >= 40 -> "Medium"
-        score >= 20 -> "Weak"
-        else -> "Very Weak"
-    }
-
-    return PasswordStrength(minOf(score, 100), strength)
-}
-
-private fun generateSecurePassword(length: Int = 16): String {
-    val uppercase = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    val lowercase = "abcdefghijklmnopqrstuvwxyz"
-    val numbers = "0123456789"
-    val symbols = "!@#$%^&*()_+-=[]{}|;:,.<>?"
-
-    val allChars = uppercase + lowercase + numbers + symbols
-    return (1..length).map { allChars.random() }.joinToString("")
-}
-
-data class PasswordStrength(
-    val score: Int,
-    val label: String
-)
+// Password strength and generation functions moved to PasswordUtils class
+// Using com.example.xdlocker.utils.PasswordUtils.PasswordStrength
+// and com.example.xdlocker.utils.PasswordUtils.calculatePasswordStrength
+// and com.example.xdlocker.utils.PasswordUtils.generateSecurePassword

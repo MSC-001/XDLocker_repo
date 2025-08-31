@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.xdlocker.ui.components.*
+import com.example.xdlocker.utils.PasswordUtils
 import com.example.xdlocker.viewmodel.AddEditPasswordViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -26,8 +27,15 @@ fun AddEditPasswordScreen(
     onNavigateBack: () -> Unit,
     viewModel: AddEditPasswordViewModel = hiltViewModel()
 ) {
+    // Define a local data class to hold password strength results
+    data class PasswordStrengthResult(val score: Int, val label: String)
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val scrollState = rememberScrollState()
+    
+    // Convert passwordStrength to local data class
+    val passwordStrengthData = remember(uiState.passwordStrength) {
+        PasswordStrengthResult(uiState.passwordStrength.score, uiState.passwordStrength.label)
+    }
 
     val titleFocusRequester = remember { FocusRequester() }
     val usernameFocusRequester = remember { FocusRequester() }
@@ -193,8 +201,8 @@ fun AddEditPasswordScreen(
             // Password strength indicator
             if (uiState.password.isNotBlank()) {
                 PasswordStrengthIndicator(
-                    strength = uiState.passwordStrength.score,
-                    label = uiState.passwordStrength.label
+                    strength = passwordStrengthData.score,
+                    label = passwordStrengthData.label
                 )
             }
 

@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.xdlocker.data.entities.UserDatabaseInfo
 import com.example.xdlocker.data.repository.MetadataRepository
+import com.example.xdlocker.utils.PasswordUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -33,7 +34,7 @@ class CreateDatabaseViewModel @Inject constructor(
             it.copy(
                 password = password,
                 passwordError = null,
-                passwordStrength = calculatePasswordStrength(password)
+                passwordStrength = PasswordUtils.calculatePasswordStrength(password)
             )
         }
     }
@@ -62,12 +63,12 @@ class CreateDatabaseViewModel @Inject constructor(
     fun createDatabase(onSuccess: (UserDatabaseInfo) -> Unit) {
         val state = _uiState.value
 
-        // Validate inputs
-        if (!validateInputs()) {
-            return
-        }
-
         viewModelScope.launch {
+            // Validate inputs in coroutine scope
+            if (!validateInputs()) {
+                return@launch
+            }
+            
             _uiState.update { it.copy(isCreating = true, error = null) }
 
             val result = metadataRepository.createDatabase(
@@ -144,80 +145,7 @@ class CreateDatabaseViewModel @Inject constructor(
         return !hasErrors
     }
 
-    private fun calculatePasswordStrength(password: String): PasswordStrength {
-        if (password.isEmpty()) {
-            return PasswordStrength(0, "")
-        }
-
-        var score = 0
-        var feedback = mutableListOf<String>()
-
-        // Length scoring
-        when {
-            password.length >= 12 -> {
-                score += 25
-                feedback.add("Good length")
-            }
-            password.length >= 8 -> {
-                score += 15
-                feedback.add("Adequate length")
-            }
-            password.length >= 6 -> {
-                score += 10
-                feedback.add("Short password")
-            }
-            else -> {
-                feedback.add("Too short")
-            }
-        }
-
-        // Character variety
-        if (password.any { it.isLowerCase() }) {
-            score += 5
-            feedback.add("Has lowercase")
-        }
-        if (password.any { it.isUpperCase() }) {
-            score += 5
-            feedback.add("Has uppercase")
-        }
-        if (password.any { it.isDigit() }) {
-            score += 5
-            feedback.add("Has numbers")
-        }
-        if (password.any { !it.isLetterOrDigit() }) {
-            score += 10
-            feedback.add("Has symbols")
-        }
-
-        // Complexity bonus
-        val charTypes = listOf(
-            password.any { it.isLowerCase() },
-            password.any { it.isUpperCase() },
-            password.any { it.isDigit() },
-            password.any { !it.isLetterOrDigit() }
-        ).count { it }
-
-        score += charTypes * 10
-
-        // Penalty for common patterns
-        if (password.contains("123") || password.contains("abc")) {
-            score -= 10
-            feedback.add("Avoid common patterns")
-        }
-
-        val strength = when {
-            score >= 80 -> "Very Strong"
-            score >= 60 -> "Strong"
-            score >= 40 -> "Medium"
-            score >= 20 -> "Weak"
-            else -> "Very Weak"
-        }
-
-        return PasswordStrength(
-            score = minOf(score, 100),
-            label = strength
-        )
-    }
+    // Password strength calculation moved to PasswordUtils class
 
     fun clearError() {
         _uiState.update { it.copy(error = null) }
@@ -241,19 +169,7 @@ data class CreateDatabaseUiState(
     val passwordError: String? = null,
     val confirmPasswordError: String? = null,
     val error: String? = null,
-    val passwordStrength: PasswordStrength = PasswordStrength(0, "")
+    val passwordStrength: PasswordUtils.PasswordStrength = PasswordUtils.PasswordStrength(0, "")
 )
 
-data class PasswordStrength(
-    val score: Int,
-    val label: String
-) {
-    val color: String
-        get() = when {
-            score >= 80 -> "green"
-            score >= 60 -> "blue"
-            score >= 40 -> "orange"
-            score >= 20 -> "red"
-            else -> "gray"
-        }
-}
+// PasswordStrength class moved to utils.PasswordUtils

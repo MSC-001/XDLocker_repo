@@ -2,6 +2,7 @@ package com.example.xdlocker.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.xdlocker.data.database.InvalidPasswordException
 import com.example.xdlocker.data.entities.PasswordEntry
 import com.example.xdlocker.data.entities.UserDatabaseInfo
 import com.example.xdlocker.data.repository.*

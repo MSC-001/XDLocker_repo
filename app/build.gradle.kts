@@ -64,12 +64,19 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.core.splashscreen)
 
+    // Material Components for XML themes (THIS IS THE FIX)
+    implementation(libs.material)
+
     // Compose BOM
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.ui)
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
+
+    // Compose Material Icons (For icon issues)
+    implementation(libs.androidx.compose.material.icons.core)     // <<< For Icons
+    implementation(libs.androidx.compose.material.icons.extended) // <<< For Icons
 
     // Navigation
     implementation(libs.androidx.navigation.compose)

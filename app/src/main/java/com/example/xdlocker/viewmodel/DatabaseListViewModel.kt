@@ -6,8 +6,6 @@ import com.example.xdlocker.data.entities.UserDatabaseInfo
 import com.example.xdlocker.data.repository.DatabaseSortCriteria
 import com.example.xdlocker.data.repository.MetadataRepository
 import com.example.xdlocker.data.repository.RepositoryResult
-import com.example.xdlocker.data.repository.filterByQuery
-import com.example.xdlocker.data.repository.sortBy
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -36,14 +34,32 @@ class DatabaseListViewModel @Inject constructor(
         searchQuery,
         sortCriteria
     ) { databases, query, sort ->
-        databases.asFlow()
-            .filterByQuery(query)
-            .sortBy(sort)
-            .first()
+        // Filter by query
+        val filtered = if (query.isBlank()) {
+            databases
+        } else {
+            val lowerQuery = query.lowercase()
+            databases.filter { database ->
+                database.databaseLabel.lowercase().contains(lowerQuery) ||
+                database.description.lowercase().contains(lowerQuery)
+            }
+        }
+        
+        // Sort by criteria
+        when (sort) {
+            DatabaseSortCriteria.NAME_ASC -> filtered.sortedBy { it.databaseLabel.lowercase() }
+            DatabaseSortCriteria.NAME_DESC -> filtered.sortedByDescending { it.databaseLabel.lowercase() }
+            DatabaseSortCriteria.DATE_CREATED_ASC -> filtered.sortedBy { it.createdAt }
+            DatabaseSortCriteria.DATE_CREATED_DESC -> filtered.sortedByDescending { it.createdAt }
+            DatabaseSortCriteria.LAST_ACCESSED_ASC -> filtered.sortedBy { it.lastAccessed }
+            DatabaseSortCriteria.LAST_ACCESSED_DESC -> filtered.sortedByDescending { it.lastAccessed }
+            DatabaseSortCriteria.ENTRY_COUNT_ASC -> filtered.sortedBy { it.entryCount }
+            DatabaseSortCriteria.ENTRY_COUNT_DESC -> filtered.sortedByDescending { it.entryCount }
+        }
     }.catch { error ->
         _uiState.update { it.copy(error = error.message) }
-        emit(emptyList())
-    }.stateIn(
+        emptyList<UserDatabaseInfo>()
+    }.stateIn<List<UserDatabaseInfo>>(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = emptyList()

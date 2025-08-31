@@ -26,6 +26,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.xdlocker.data.entities.UserDatabaseInfo
 import com.example.xdlocker.ui.components.*
 import com.example.xdlocker.ui.theme.DatabaseColors
+import com.example.xdlocker.utils.PasswordUtils
 import com.example.xdlocker.viewmodel.CreateDatabaseViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -35,8 +36,15 @@ fun CreateDatabaseScreen(
     onDatabaseCreated: (UserDatabaseInfo) -> Unit,
     viewModel: CreateDatabaseViewModel = hiltViewModel()
 ) {
+    // Define a local data class to hold password strength results
+    data class PasswordStrengthResult(val score: Int, val label: String)
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val scrollState = rememberScrollState()
+    
+    // Convert passwordStrength to local data class
+    val passwordStrengthData = remember(uiState.passwordStrength) {
+        PasswordStrengthResult(uiState.passwordStrength.score, uiState.passwordStrength.label)
+    }
 
     val labelFocusRequester = remember { FocusRequester() }
     val passwordFocusRequester = remember { FocusRequester() }
@@ -150,8 +158,8 @@ fun CreateDatabaseScreen(
             // Password strength indicator
             if (uiState.password.isNotBlank()) {
                 PasswordStrengthIndicator(
-                    strength = uiState.passwordStrength.score,
-                    label = uiState.passwordStrength.label
+                    strength = passwordStrengthData.score,
+                    label = passwordStrengthData.label
                 )
             }
 
