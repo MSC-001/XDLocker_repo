@@ -1,10 +1,5 @@
 package com.example.xdlocker.security
 
-sealed class PinResult<out T> {
-    data class Success<out T>(val data: T) : PinResult<T>()
-    data class Error(val message: String) : PinResult<Nothing>() // Can include an optional error code or type
-}
-
 interface AppLockManager {
     /**
      * Sets up a new PIN.

@@ -1,7 +1,9 @@
 package com.example.xdlocker.ui.screens
 
+import android.widget.Toast
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -9,10 +11,18 @@ import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.xdlocker.viewmodel.SettingsViewModel
 
@@ -21,16 +31,33 @@ import com.example.xdlocker.viewmodel.SettingsViewModel
 fun SettingsScreen(
     onNavigateBack: () -> Unit,
     onNavigateToAppLockSetup: () -> Unit,
-    viewModel: SettingsViewModel // Changed: Removed default hiltViewModel()
+    viewModel: SettingsViewModel
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val scrollState = rememberScrollState()
+    val context = LocalContext.current
 
     var showExportDialog by remember { mutableStateOf(false) }
     var showImportDialog by remember { mutableStateOf(false) }
     var showClearDataDialog by remember { mutableStateOf(false) }
     var showSortOrderDialog by remember { mutableStateOf(false) }
     var showAutoLockDialog by remember { mutableStateOf(false) }
+    var showRemovePinDialog by remember { mutableStateOf(false) }
+    var pinInputForRemoval by remember { mutableStateOf("") }
+
+    // Observe lifecycle to refresh UI state on resume
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, viewModel) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.refreshAppLockStatus()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -59,17 +86,14 @@ fun SettingsScreen(
                     icon = Icons.Default.Lock,
                     onClick = {
                         if (uiState.isAppLockEnabled) {
-                            // Show options to change/remove PIN
+                            pinInputForRemoval = "" // Reset PIN input
+                            viewModel.clearError() // Clear previous errors if any
+                            showRemovePinDialog = true
                         } else {
                             onNavigateToAppLockSetup()
                         }
                     },
-                    trailing = {
-                        Switch(
-                            checked = uiState.isAppLockEnabled,
-                            onCheckedChange = { viewModel.toggleAppLock() }
-                        )
-                    }
+                    trailing = null
                 )
 
                 // Biometric Authentication
@@ -178,8 +202,8 @@ fun SettingsScreen(
             }
 
             Spacer(modifier = Modifier.height(32.dp))
-        }
-    }
+        } // End Column
+    } // End Scaffold
 
     // Dialogs
     if (showSortOrderDialog) {
@@ -209,9 +233,7 @@ fun SettingsScreen(
     if (showExportDialog) {
         ExportDataDialog(
             onExport = {
-                viewModel.exportData { exportData ->
-                    // Handle export data
-                }
+                viewModel.exportData { /* exportData -> Handle export data */ }
                 showExportDialog = false
             },
             onDismiss = { showExportDialog = false },
@@ -222,9 +244,7 @@ fun SettingsScreen(
     if (showImportDialog) {
         ImportDataDialog(
             onImport = { data ->
-                viewModel.importData(data) {
-                    // Handle import success
-                }
+                viewModel.importData(data) { /* Handle import success */ }
                 showImportDialog = false
             },
             onDismiss = { showImportDialog = false },
@@ -236,13 +256,38 @@ fun SettingsScreen(
         ClearDataDialog(
             requirePin = uiState.isAppLockEnabled,
             onConfirm = { pin ->
-                viewModel.clearAllData(pin) {
-                    // Handle clear success
-                }
+                viewModel.clearAllData(pin) { /* Handle clear success */ }
                 showClearDataDialog = false
             },
             onDismiss = { showClearDataDialog = false },
             isLoading = uiState.isLoading
+        )
+    }
+
+    if (showRemovePinDialog) {
+        RemovePinDialog(
+            pinInput = pinInputForRemoval,
+            onPinInputChange = { pinInputForRemoval = it },
+            onDismiss = {
+                showRemovePinDialog = false
+                viewModel.clearError() // Clear error on dismiss
+            },
+            onConfirm = {
+                if (pinInputForRemoval.isNotBlank()) {
+                    viewModel.removeAppLock(
+                        pin = pinInputForRemoval,
+                        onSuccess = {
+                            showRemovePinDialog = false
+                            viewModel.refreshAppLockStatus() // Explicitly refresh
+                            Toast.makeText(context, "App Lock Disabled", Toast.LENGTH_SHORT).show()
+                        },
+                    )
+                } else {
+                    // Optionally, show a local error if PIN is blank, though ViewModel should handle it too
+                    // viewModel.setError("PIN cannot be empty") // Example
+                }
+            },
+            error = uiState.error
         )
     }
 }
@@ -260,7 +305,6 @@ private fun SettingsSection(
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
         )
-
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -268,7 +312,6 @@ private fun SettingsSection(
         ) {
             content()
         }
-
         Spacer(modifier = Modifier.height(16.dp))
     }
 }
@@ -298,9 +341,7 @@ private fun SettingsItem(
                 tint = if (isDestructive) MaterialTheme.colorScheme.error
                 else MaterialTheme.colorScheme.onSurfaceVariant
             )
-
             Spacer(modifier = Modifier.width(16.dp))
-
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = title,
@@ -314,13 +355,11 @@ private fun SettingsItem(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-
             trailing?.invoke()
         }
     }
 }
 
-// Dialog Components
 @Composable
 private fun SortOrderDialog(
     currentSortOrder: String,
@@ -495,7 +534,9 @@ private fun ClearDataDialog(
                         value = pin,
                         onValueChange = { pin = it },
                         label = { Text("Enter PIN to confirm") },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword)
                     )
                 }
             }
@@ -525,3 +566,51 @@ private fun ClearDataDialog(
         }
     )
 }
+
+// Dialog to remove PIN
+@Composable
+private fun RemovePinDialog(
+    pinInput: String,
+    onPinInputChange: (String) -> Unit,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+    error: String?
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Enter Current PIN to Disable") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = pinInput,
+                    onValueChange = onPinInputChange,
+                    label = { Text("Current PIN") },
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                    isError = error != null,
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                if (error != null) {
+                    Text(
+                        text = error,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = onConfirm) {
+                Text("Confirm Disable")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+

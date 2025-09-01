@@ -84,27 +84,6 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { _themeChangedEvent.emit(Unit) }
     }
 
-    fun toggleAppLock() {
-        // This function might need re-evaluation. Do we allow toggling the preference
-        // if the PIN setup/removal should be done via setupAppLock/removeAppLock?
-        // For now, let's assume it reflects the preference that UI might use to show/hide PIN setup options.
-        val currentAppLockEnabledState = _uiState.value.isAppLockEnabled
-        if (currentAppLockEnabledState) {
-            // If currently enabled, this toggle implies user wants to navigate to remove it.
-            // The actual removal will be handled by removeAppLock() after PIN verification.
-            // We don't change the underlying PIN state here.
-            // We just reflect an *intent* or a UI preference.
-            // This part is tricky as isAppLockEnabled is now primarily driven by appLockManager.isPinConfigured()
-            _uiState.update { it.copy(error = "Please use 'Remove App Lock' with your PIN to disable.") }
-        } else {
-            // If currently disabled, this toggle implies user wants to navigate to set it up.
-            // The actual setup will be handled by setupAppLock().
-            // We don't change the underlying PIN state here.
-            _uiState.update { it.copy(error = "Please use 'Setup App Lock' to enable.") }
-        }
-        // savePreference("app_lock_enabled", newValue) // Preference for app_lock_enabled is less reliable now
-    }
-
     fun toggleBiometric() {
         if (!_uiState.value.isAppLockEnabled) {
             _uiState.update { it.copy(error = "Enable app lock first before enabling biometrics.") }
@@ -136,8 +115,7 @@ class SettingsViewModel @Inject constructor(
                             isAppLockEnabled = true,
                             showSetupSuccess = true
                         )
-                    }
-                    savePreference("app_lock_enabled", true) // Keep for quick UI hints if needed
+                    } // Keep for quick UI hints if needed
                     onSuccess()
                 }
                 is PinResult.Error -> {
@@ -148,6 +126,22 @@ class SettingsViewModel @Inject constructor(
                         )
                     }
                 }
+            }
+        }
+    }
+
+    fun refreshAppLockStatus() {
+        viewModelScope.launch {
+            val isPinActuallyConfigured = appLockManager.isPinConfigured()
+            // We also need to consider the biometric status in relation to the app lock
+            val savedBiometricPref = getPreference("biometric_enabled", false) as? Boolean ?: false
+            val actualBiometricEnabled = if (isPinActuallyConfigured) savedBiometricPref else false
+
+            _uiState.update { currentState ->
+                currentState.copy(
+                    isAppLockEnabled = isPinActuallyConfigured,
+                    isBiometricEnabled = actualBiometricEnabled
+                )
             }
         }
     }
@@ -190,7 +184,6 @@ class SettingsViewModel @Inject constructor(
                             showRemoveSuccess = true
                         )
                     }
-                    savePreference("app_lock_enabled", false)
                     savePreference("biometric_enabled", false)
                     onSuccess()
                 }
