@@ -48,7 +48,7 @@ fun DatabaseListScreen(
             viewModel.clearSuccessMessages() // Make sure this function exists in ViewModel
         }
     }
-    
+
     // Clear error when dialogs are dismissed (good practice)
     LaunchedEffect(showDeleteDialog, showRenameDialog) {
         if (!showDeleteDialog && !showRenameDialog) {
@@ -554,8 +554,8 @@ private fun DeleteDatabaseDialog(
     var password by rememberSaveable { mutableStateOf("") }
     var passwordError by remember { mutableStateOf<String?>(null) } // Local error for password field
 
-    val currentPasswordError = errorMessage?.takeIf { it.contains("password", ignoreCase = true) } 
-                                ?: passwordError // Combine VM error with local error
+    val currentPasswordError = errorMessage?.takeIf { it.contains("password", ignoreCase = true) }
+        ?: passwordError // Combine VM error with local error
 
     AlertDialog(
         onDismissRequest = {if (!isLoading) onDismiss()},

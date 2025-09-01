@@ -100,8 +100,8 @@ dependencies {
 
     // ViewModel
     implementation(libs.androidx.lifecycle.runtime.ktx) // Your existing version (e.g., 2.7.0)
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.lifecycle.runtime.compose)
 
     // Biometric Authentication
     implementation(libs.androidx.biometric)

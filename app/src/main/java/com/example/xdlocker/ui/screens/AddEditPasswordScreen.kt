@@ -4,8 +4,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.Notes
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -20,7 +18,6 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.xdlocker.ui.components.*
-import com.example.xdlocker.utils.PasswordUtils
 import com.example.xdlocker.viewmodel.AddEditPasswordViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -29,15 +26,8 @@ fun AddEditPasswordScreen(
     onNavigateBack: () -> Unit,
     viewModel: AddEditPasswordViewModel = hiltViewModel()
 ) {
-    // Define a local data class to hold password strength results
-    data class PasswordStrengthResult(val score: Int, val label: String)
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val scrollState = rememberScrollState()
-
-    // Convert passwordStrength to local data class
-    val passwordStrengthData = remember(uiState.passwordStrength) {
-        PasswordStrengthResult(uiState.passwordStrength.score, uiState.passwordStrength.label)
-    }
 
     val titleFocusRequester = remember { FocusRequester() }
     val usernameFocusRequester = remember { FocusRequester() }
@@ -67,7 +57,7 @@ fun AddEditPasswordScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                        Icon(Icons.Default.ArrowBack, "Back")
                     }
                 },
                 actions = {
@@ -118,12 +108,38 @@ fun AddEditPasswordScreen(
             }
 
             // Error display
-            uiState.error?.let { error ->
-                ErrorCard(
-                    message = error,
-                    onDismiss = viewModel::clearError
-                )
-                Spacer(modifier = Modifier.height(16.dp))
+            @Composable
+            fun ErrorCard(message: String, onDismiss: () -> Unit) { // 'private' removed
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(8.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer
+                    ),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = message,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.weight(1f)
+                        )
+                        IconButton(onClick = onDismiss) {
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = "Dismiss error",
+                                tint = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                    }
+                }
             }
 
             // Title field
@@ -203,8 +219,8 @@ fun AddEditPasswordScreen(
             // Password strength indicator
             if (uiState.password.isNotBlank()) {
                 PasswordStrengthIndicator(
-                    strength = passwordStrengthData.score,
-                    label = passwordStrengthData.label
+                    strength = uiState.passwordStrength.score,
+                    label = uiState.passwordStrength.label
                 )
             }
 
@@ -227,7 +243,7 @@ fun AddEditPasswordScreen(
                 value = uiState.notes,
                 onValueChange = viewModel::onNotesChanged,
                 label = "Notes",
-                leadingIcon = Icons.AutoMirrored.Filled.Notes,
+                leadingIcon = Icons.Default.Notes,
                 maxLines = 4,
                 singleLine = false,
                 imeAction = ImeAction.Done
@@ -276,7 +292,7 @@ private fun PasswordGeneratorDialog(
     onPasswordGenerated: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var length by remember { mutableIntStateOf(12) }
+    var length by remember { mutableStateOf(12) }
     var includeUppercase by remember { mutableStateOf(true) }
     var includeLowercase by remember { mutableStateOf(true) }
     var includeNumbers by remember { mutableStateOf(true) }
@@ -417,48 +433,6 @@ private fun PasswordGeneratorDialog(
         }
     )
 }
-
-@Composable
-private fun ErrorCard(message: String, onDismiss: () -> Unit) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.errorContainer,
-            contentColor = MaterialTheme.colorScheme.onErrorContainer
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Icon(
-                imageVector = Icons.Filled.Error,
-                contentDescription = null
-            )
-            Text(
-                text = message,
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(horizontal = 8.dp),
-                style = MaterialTheme.typography.bodyMedium
-            )
-            IconButton(onClick = onDismiss) {
-                Icon(
-                    imageVector = Icons.Filled.Close,
-                    contentDescription = "Dismiss error"
-                )
-            }
-        }
-    }
-}
-
-// Existing canSaveEntry function will follow here...
 
 private fun canSaveEntry(uiState: com.example.xdlocker.viewmodel.AddEditPasswordUiState): Boolean {
     return uiState.title.isNotBlank() &&

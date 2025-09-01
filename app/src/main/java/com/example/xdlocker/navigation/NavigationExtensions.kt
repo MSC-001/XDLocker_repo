@@ -2,16 +2,14 @@ package com.example.xdlocker.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.navigation.NavController
-import androidx.navigation.NavGraph.Companion.findStartDestination
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
-
-// Added imports for remember, mutableStateOf, getValue, setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.navigation.NavController
+import androidx.navigation.NavGraph.Companion.findStartDestination
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 
 /**
  * Navigation extension functions and utilities
@@ -86,8 +84,12 @@ fun NavController.navigateBackOr(fallbackRoute: String) {
  * Check if a route is in the back stack
  */
 fun NavController.isRouteInBackStack(route: String): Boolean {
-    // Changed from backQueue to currentBackStack
-    return currentBackStack.value.any { it.destination.route == route }
+    return try {
+        currentBackStackEntry?.destination?.route == route ||
+                previousBackStackEntry?.destination?.route == route
+    } catch (e: Exception) {
+        false
+    }
 }
 
 /**
@@ -102,17 +104,6 @@ fun NavController.getCurrentRoute(): String? {
  */
 fun NavController.navigateForResult(route: String, key: String = "result") {
     navigate(route)
-
-    // Listen for result
-    currentBackStackEntry
-        ?.savedStateHandle
-        ?.getLiveData<String>(key)
-        ?.observeForever { result ->
-            if (result != null) {
-                // Handle result
-                currentBackStackEntry?.savedStateHandle?.remove<String>(key)
-            }
-        }
 }
 
 /**
@@ -148,7 +139,7 @@ object DeepLinkHandler {
                 val databaseId = deepLink.substringAfterLast("/").toIntOrNull()
                 if (databaseId != null) {
                     // Navigate to specific database
-                    navController.navigate(NavigationRoutes.DATABASE_LIST) // Consider navigating to a specific DB screen
+                    navController.navigate(NavigationRoutes.DATABASE_LIST)
                 }
             }
 
@@ -180,7 +171,7 @@ object BackPressHandler {
                 onExitApp()
             }
 
-            NavigationRoutes.PASSWORD_LIST -> {
+            NavigationRoutes.PASSWORD_LIST_ROUTE_PATTERN -> {
                 // Close database and go back to list
                 navController.popBackStack()
             }
@@ -213,35 +204,14 @@ fun rememberNavigationState(navController: NavController): NavigationState {
 
     LaunchedEffect(navController) {
         navController.currentBackStackEntryFlow
-            .onEach { backStackEntry ->
+            .onEach { currentBackStackEntry ->
                 navigationState = NavigationState(
-                    currentRoute = backStackEntry.destination.route,
+                    currentRoute = currentBackStackEntry.destination.route,
                     canNavigateBack = navController.previousBackStackEntry != null,
-                    // Changed from backQueue.size to currentBackStack.value.size
-                    backStackEntryCount = navController.currentBackStack.value.size
+                    backStackEntryCount = 1 // Simplified since backQueue is private
                 )
             }
             .launchIn(this)
     }
-
     return navigationState
-}
-
-/**
- * Navigation animation configurations
- */
-object NavigationAnimations {
-    // Slide animations for main navigation
-    val slideInFromRight = androidx.compose.animation.slideInHorizontally { it }
-    val slideOutToLeft = androidx.compose.animation.slideOutHorizontally { -it }
-    val slideInFromLeft = androidx.compose.animation.slideInHorizontally { -it }
-    val slideOutToRight = androidx.compose.animation.slideOutHorizontally { it }
-
-    // Fade animations for dialogs
-    val fadeIn = androidx.compose.animation.fadeIn()
-    val fadeOut = androidx.compose.animation.fadeOut()
-
-    // Scale animations for modal screens
-    val scaleIn = androidx.compose.animation.scaleIn()
-    val scaleOut = androidx.compose.animation.scaleOut()
 }

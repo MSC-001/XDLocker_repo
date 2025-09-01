@@ -33,5 +33,5 @@ interface AppLockManager {
      * Checks if a PIN is currently configured.
      * Returns true if a PIN is set, false otherwise.
      */
-    suspend fun isPinConfigured(): Boolean
+    fun isPinConfigured(): Boolean
 }

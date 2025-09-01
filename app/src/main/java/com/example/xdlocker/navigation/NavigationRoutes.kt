@@ -1,39 +1,7 @@
 package com.example.xdlocker.navigation
 
-/**
- * Navigation routes for the XDLocker app
- */
-object NavigationRoutes {
-    const val DATABASE_LIST = "database_list"
-    const val CREATE_DATABASE = "create_database"
-    const val PASSWORD_LIST = "password_list/{databaseId}/{databaseLabel}/{databaseFilename}"
-    const val ADD_PASSWORD = "add_password/{databaseFilename}"
-    const val EDIT_PASSWORD = "edit_password/{databaseFilename}/{entryId}"
-    const val SETTINGS = "settings"
-    const val APP_LOCK_SETUP = "app_lock_setup"
-    const val CHANGE_PASSWORD = "change_password/{databaseId}"
+import android.net.Uri
 
-    // Route builders
-    fun passwordList(databaseId: Int, databaseLabel: String, databaseFilename: String): String {
-        return "password_list/$databaseId/$databaseLabel/$databaseFilename"
-    }
-
-    fun addPassword(databaseFilename: String): String {
-        return "add_password/$databaseFilename"
-    }
-
-    fun editPassword(databaseFilename: String, entryId: Int): String {
-        return "edit_password/$databaseFilename/$entryId"
-    }
-
-    fun changePassword(databaseId: Int): String {
-        return "change_password/$databaseId"
-    }
-}
-
-/**
- * Navigation arguments
- */
 object NavigationArgs {
     const val DATABASE_ID = "databaseId"
     const val DATABASE_LABEL = "databaseLabel"
@@ -41,16 +9,39 @@ object NavigationArgs {
     const val ENTRY_ID = "entryId"
 }
 
-/**
- * Navigation destinations sealed class for type safety
- */
-sealed class NavigationDestination(val route: String) {
-    object DatabaseList : NavigationDestination(NavigationRoutes.DATABASE_LIST)
-    object CreateDatabase : NavigationDestination(NavigationRoutes.CREATE_DATABASE)
-    object PasswordList : NavigationDestination(NavigationRoutes.PASSWORD_LIST)
-    object AddPassword : NavigationDestination(NavigationRoutes.ADD_PASSWORD)
-    object EditPassword : NavigationDestination(NavigationRoutes.EDIT_PASSWORD)
-    object Settings : NavigationDestination(NavigationRoutes.SETTINGS)
-    object AppLockSetup : NavigationDestination(NavigationRoutes.APP_LOCK_SETUP)
-    object ChangePassword : NavigationDestination(NavigationRoutes.CHANGE_PASSWORD)
+object NavigationRoutes {
+    const val APP_LOCK_SCREEN = "app_lock_screen"
+    const val SPLASH_SCREEN = "splash_screen"
+    const val DATABASE_LIST = "database_list"
+    const val CREATE_DATABASE = "create_database"
+    const val SETTINGS = "settings"
+    // Changed APP_LOCK_SETUP to APP_LOCK_SETUP_SCREEN to match its usage in your original AppNavigation
+    const val APP_LOCK_SETUP_SCREEN = "app_lock_setup_screen"
+
+    // Route patterns for routes that take arguments
+    const val PASSWORD_LIST_ROUTE_PATTERN =
+        "password_list/{${NavigationArgs.DATABASE_ID}}/{${NavigationArgs.DATABASE_LABEL}}/{${NavigationArgs.DATABASE_FILENAME}}"
+    const val ADD_PASSWORD_ROUTE_PATTERN = "add_password/{${NavigationArgs.DATABASE_FILENAME}}"
+    const val EDIT_PASSWORD_ROUTE_PATTERN = "edit_password/{${NavigationArgs.ENTRY_ID}}"
+    const val CHANGE_PASSWORD_ROUTE_PATTERN = "change_password/{${NavigationArgs.DATABASE_ID}}"
+
+    // Helper functions to build routes with arguments
+    fun passwordList(dbId: Int, dbLabel: String, dbFilename: String): String {
+        val encodedLabel = Uri.encode(dbLabel)
+        val encodedFilename = Uri.encode(dbFilename)
+        return "password_list/$dbId/$encodedLabel/$encodedFilename"
+    }
+
+    fun addPassword(databaseFilename: String): String {
+        val encodedFilename = Uri.encode(databaseFilename)
+        return "add_password/$encodedFilename"
+    }
+
+    fun editPassword(entryId: Int): String {
+        return "edit_password/$entryId"
+    }
+
+    fun changePassword(databaseId: Int): String {
+        return "change_password/$databaseId"
+    }
 }

@@ -6,109 +6,135 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
+import androidx.compose.material3.MaterialTheme // Keep this for Surface
+import androidx.compose.material3.Surface // Keep this
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState // For appStateFlow
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.rememberNavController
 import com.example.xdlocker.navigation.AppNavigation
+import com.example.xdlocker.navigation.NavigationRoutes // Ensure this is your correct import
+import com.example.xdlocker.security.AppLockManager
+import com.example.xdlocker.services.AppLockStateService
 import com.example.xdlocker.ui.theme.XDLockerTheme
 import com.example.xdlocker.viewmodel.SettingsViewModel
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.collectLatest // For themeChangedEvent if still needed
 import kotlinx.coroutines.launch
+import javax.inject.Inject
+
+// Sealed interface to represent the state of the app initialization
+sealed interface AppState {
+    object Loading : AppState
+    data class Ready(val startDestination: String) : AppState
+}
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
-    // Get a reference to the ViewModel at the Activity level
+    @Inject
+    lateinit var appLockManager: AppLockManager
+
+    @Inject
+    lateinit var appLockStateService: AppLockStateService
+
     private val settingsViewModel: SettingsViewModel by viewModels()
 
-    private var isAppLocked = false
-    private var splashScreenVisible = true
+    // Use a StateFlow for appState to be collected by Compose
+    private val appStateFlow = MutableStateFlow<AppState>(AppState.Loading)
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        // Install splash screen
-        val splashScreen = installSplashScreen()
-
+        val splashScreen = installSplashScreen() // Install splash screen first
         super.onCreate(savedInstanceState)
 
-        // Keep splash screen visible while loading
-        splashScreen.setKeepOnScreenCondition { splashScreenVisible }
+        // Keep splash screen visible until appState is Ready
+        splashScreen.setKeepOnScreenCondition {
+            appStateFlow.value == AppState.Loading
+        }
+
+        lifecycleScope.launch {
+            // Determine initial route
+            val pinConfigured = appLockManager.isPinConfigured()
+            val startRoute = if (pinConfigured && !appLockStateService.isCurrentlyUnlocked()) {
+                NavigationRoutes.APP_LOCK_SCREEN
+            } else {
+                // If PIN is configured but already unlocked in session, go to main.
+                // If PIN not configured, go to main.
+                NavigationRoutes.DATABASE_LIST // ASSUMPTION: Your main screen after unlock or if no lock
+            }
+            appStateFlow.value = AppState.Ready(startRoute)
+            Log.d("MainActivity", "AppState is Ready. Start route: $startRoute")
+        }
 
         enableEdgeToEdge()
         setContent {
-            XDLockerApp(settingsViewModel = settingsViewModel) // Pass the activity's instance
+            // Collect appStateFlow here
+            val currentAppState by appStateFlow.collectAsState()
+
+            XDLockerApp(
+                settingsViewModel = settingsViewModel,
+                appState = currentAppState,
+                appLockStateService = appLockStateService // Pass the service
+            )
         }
 
-        // Hide splash screen after delay
+        // Theme change listener
         lifecycleScope.launch {
-            delay(1500) // Show splash for 1.5 seconds
-            splashScreenVisible = false
-        }
-        lifecycleScope.launch {
-            settingsViewModel.themeChangedEvent.collect {
-                Log.d("MainActivityTheme", "Theme change event received, attempting to recreate Activity.") // ADD THIS LINE
-                recreate() // This will recreate the Activity
+            settingsViewModel.themeChangedEvent.collectLatest { // Using collectLatest
+                Log.d("MainActivityTheme", "Theme change event received, attempting to recreate Activity.")
+                recreate() // Ensure this is the behavior you want
             }
         }
     }
 
-    override fun onResume() {
-        super.onResume()
-        // Check if app should be locked
-        checkAppLockStatus()
-    }
-
-    override fun onPause() {
-        super.onPause()
-        // Start app lock timer if enabled
-        startAppLockTimer()
-    }
-
-    private fun checkAppLockStatus() {
-        // Check if app lock is enabled and app should be locked
-        // This would check SharedPreferences and elapsed time
-    }
-
-    private fun startAppLockTimer() {
-        // Start timer for auto-lock feature
-        // This would use WorkManager or similar for background timing
+    override fun onStop() {
+        super.onStop()
+        // Lock the app if PIN is configured when app goes to background
+        if (::appLockManager.isInitialized && appLockManager.isPinConfigured()) {
+            Log.d("MainActivity", "onStop: Locking app.")
+            appLockStateService.onAppGoesToBackgroundOrLockNeeded()
+        }
     }
 }
 
 @Composable
 fun XDLockerApp(
-    settingsViewModel: SettingsViewModel
+    settingsViewModel: SettingsViewModel,
+    appState: AppState, // Updated parameter
+    appLockStateService: AppLockStateService // New parameter
 ) {
     val navController = rememberNavController()
-    //val navigationState = rememberNavigationState(navController)
-    val context = LocalContext.current
-    val uiState by settingsViewModel.uiState.collectAsState()
-
-    Log.d("XDLockerAppTheme", "uiState.isDarkTheme from ViewModel: ${uiState.isDarkTheme}") // Log ViewModel state
+    val uiState by settingsViewModel.uiState.collectAsState() // For theme
 
     XDLockerTheme(darkTheme = uiState.isDarkTheme) {
-        // Log the background color that MaterialTheme is providing
-        Log.d("XDLockerAppTheme", "MaterialTheme.colorScheme.background: ${MaterialTheme.colorScheme.background}")
-        Log.d("XDLockerAppTheme", "MaterialTheme.colorScheme.surface: ${MaterialTheme.colorScheme.surface}")
-        Log.d("XDLockerAppTheme", "MaterialTheme.colorScheme.primary: ${MaterialTheme.colorScheme.primary}")
-
-
         Surface(
             modifier = Modifier.fillMaxSize(),
             color = MaterialTheme.colorScheme.background
         ) {
-            AppNavigation(
-                navController = navController,
-                settingsViewModel = settingsViewModel // This should already be there
-            )
+            when (appState) {
+                is AppState.Loading -> {
+                    // Content displayed while determining start route (splash screen should cover this)
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        // Optional: Show a progress bar if splash screen hiding is too abrupt
+                        // CircularProgressIndicator()
+                    }
+                }
+                is AppState.Ready -> {
+                    AppNavigation(
+                        navController = navController,
+                        settingsViewModel = settingsViewModel, // Pass if needed by AppNavigation/screens
+                        startDestination = appState.startDestination, // Pass determined startDestination
+                        appLockStateService = appLockStateService // Pass the service
+                    )
+                }
+            }
         }
     }
 }

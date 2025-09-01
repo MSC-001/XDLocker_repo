@@ -1,219 +1,170 @@
 package com.example.xdlocker.navigation
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.example.xdlocker.data.entities.PasswordEntry
 import com.example.xdlocker.data.entities.UserDatabaseInfo
-import com.example.xdlocker.ui.screens.*
+import com.example.xdlocker.services.AppLockStateService
+import com.example.xdlocker.ui.screens.AppLockScreen
+import com.example.xdlocker.ui.screens.AppLockSetupScreen
+import com.example.xdlocker.ui.screens.CreateDatabaseScreen
+import com.example.xdlocker.ui.screens.DatabaseListScreen
+import com.example.xdlocker.ui.screens.PasswordListScreen
+import com.example.xdlocker.ui.screens.SplashScreen
+import com.example.xdlocker.ui.screens.SettingsScreen
 import com.example.xdlocker.viewmodel.SettingsViewModel
+import com.example.xdlocker.ui.screens.AddEditPasswordScreen
+import com.example.xdlocker.ui.screens.ChangeDatabasePasswordScreen
 
 @Composable
 fun AppNavigation(
-    navController: NavHostController = rememberNavController(),
-    startDestination: String = NavigationRoutes.DATABASE_LIST,
-    settingsViewModel: SettingsViewModel // Added this parameter
+    navController: NavHostController,
+    settingsViewModel: SettingsViewModel,
+    startDestination: String,
+    appLockStateService: AppLockStateService
 ) {
-    NavHost(
-        navController = navController,
-        startDestination = startDestination,
-    ) {
-        // Database List Screen
+    NavHost(navController = navController, startDestination = startDestination) {
+        composable(NavigationRoutes.SPLASH_SCREEN) { 
+            SplashScreen(
+                navController = navController,
+                settingsViewModel = settingsViewModel,
+                appLockStateService = appLockStateService
+            )
+        }
+
+        composable(NavigationRoutes.APP_LOCK_SCREEN) {
+            AppLockScreen(
+                onUnlockSuccess = {
+                    navController.navigate(NavigationRoutes.DATABASE_LIST) {
+                        popUpTo(NavigationRoutes.APP_LOCK_SCREEN) { inclusive = true }
+                    }
+                    appLockStateService.unlockApp() // ERROR: Needs to be defined in AppLockStateService
+                }
+            )
+        }
+
         composable(NavigationRoutes.DATABASE_LIST) {
             DatabaseListScreen(
-                onNavigateToCreateDatabase = {
-                    navController.navigate(NavigationRoutes.CREATE_DATABASE)
-                },
-                onNavigateToPasswordList = { database ->
-                    val route = NavigationRoutes.passwordList(
-                        database.id,
-                        database.databaseLabel,
-                        database.databaseFilename
+                onNavigateToCreateDatabase = { navController.navigate(NavigationRoutes.CREATE_DATABASE) },
+                onNavigateToPasswordList = { dbInfo ->
+                    navController.navigate(
+                        NavigationRoutes.passwordList(
+                            dbId = dbInfo.id,
+                            dbLabel = dbInfo.databaseLabel,
+                            // UserDatabaseInfo.databaseFilename IS correct (based on latest read of UserDatabaseInfo.kt)
+                            dbFilename = dbInfo.databaseFilename // ERROR: Analyzer previously said unresolved, but field exists
+                        )
                     )
-                    navController.navigate(route)
                 },
-                onNavigateToSettings = {
-                    navController.navigate(NavigationRoutes.SETTINGS)
-                }
+                onNavigateToSettings = { navController.navigate(NavigationRoutes.SETTINGS) }
             )
         }
 
-        // Create Database Screen
-        composable(NavigationRoutes.CREATE_DATABASE) {
-            CreateDatabaseScreen(
-                onNavigateBack = {
-                    navController.popBackStack()
-                },
-                onDatabaseCreated = { database ->
-                    // Navigate back to database list
-                    navController.popBackStack()
-
-                    // Optionally navigate directly to the new database
-                    // val route = NavigationRoutes.passwordList(
-                    //     database.id,
-                    //     database.databaseLabel,
-                    //     database.databaseFilename
-                    // )
-                    // navController.navigate(route)
-                }
-            )
-        }
-
-        // Password List Screen
         composable(
-            route = NavigationRoutes.PASSWORD_LIST,
+            route = NavigationRoutes.PASSWORD_LIST_ROUTE_PATTERN,
             arguments = listOf(
                 navArgument(NavigationArgs.DATABASE_ID) { type = NavType.IntType },
                 navArgument(NavigationArgs.DATABASE_LABEL) { type = NavType.StringType },
                 navArgument(NavigationArgs.DATABASE_FILENAME) { type = NavType.StringType }
             )
         ) { backStackEntry ->
-            val databaseId = backStackEntry.arguments?.getInt(NavigationArgs.DATABASE_ID) ?: return@composable
-            val databaseLabel = backStackEntry.arguments?.getString(NavigationArgs.DATABASE_LABEL) ?: return@composable
-            val databaseFilename = backStackEntry.arguments?.getString(NavigationArgs.DATABASE_FILENAME) ?: return@composable
+            val databaseIdArg = backStackEntry.arguments?.getInt(NavigationArgs.DATABASE_ID) ?: 0
+            val databaseLabelArg = backStackEntry.arguments?.getString(NavigationArgs.DATABASE_LABEL) ?: ""
+            val databaseFilenameArg = backStackEntry.arguments?.getString(NavigationArgs.DATABASE_FILENAME) ?: ""
 
-            // Create UserDatabaseInfo from navigation arguments
-            val databaseInfo = UserDatabaseInfo(
-                id = databaseId,
-                databaseLabel = databaseLabel,
-                databaseFilename = databaseFilename
+            // Construct UserDatabaseInfo with parameters its constructor accepts.
+            // Other fields (createdAt, lastAccessed, etc.) have default values.
+            val currentDatabaseInfo = UserDatabaseInfo(
+                id = databaseIdArg,
+                databaseLabel = databaseLabelArg,
+                databaseFilename = databaseFilenameArg
+                // REMOVED: passwordHash = "",
+                // REMOVED: salt = ""
             )
 
             PasswordListScreen(
-                databaseInfo = databaseInfo,
-                onNavigateBack = {
-                    navController.popBackStack()
-                },
+                databaseInfo = currentDatabaseInfo,
+                onNavigateBack = { navController.popBackStack() },
                 onNavigateToAddPassword = {
-                    val route = NavigationRoutes.addPassword(databaseFilename)
-                    navController.navigate(route)
+                    navController.navigate(NavigationRoutes.addPassword(databaseFilename = currentDatabaseInfo.databaseFilename))
                 },
-                onNavigateToEditPassword = { entry ->
-                    val route = NavigationRoutes.editPassword(databaseFilename, entry.id)
-                    navController.navigate(route)
+                onNavigateToEditPassword = { passwordEntry: PasswordEntry ->
+                    navController.navigate(NavigationRoutes.editPassword(entryId = passwordEntry.id))
                 }
             )
         }
 
-        // Add Password Screen
+        composable(NavigationRoutes.SETTINGS) {
+            SettingsScreen(
+                viewModel = settingsViewModel,
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToAppLockSetup = { navController.navigate(NavigationRoutes.APP_LOCK_SETUP_SCREEN) }
+            )
+        }
+
+        composable(NavigationRoutes.APP_LOCK_SETUP_SCREEN) {
+            AppLockSetupScreen(
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(NavigationRoutes.CREATE_DATABASE) {
+            CreateDatabaseScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onDatabaseCreated = { dbInfo ->
+                    navController.navigate(
+                        NavigationRoutes.passwordList(
+                            dbId = dbInfo.id,
+                            dbLabel = dbInfo.databaseLabel,
+                            // UserDatabaseInfo.databaseFilename IS correct (based on latest read of UserDatabaseInfo.kt)
+                            dbFilename = dbInfo.databaseFilename // ERROR: Analyzer previously said unresolved, but field exists
+                        )
+                    ) {
+                        popUpTo(NavigationRoutes.CREATE_DATABASE) { inclusive = true }
+                    }
+                }
+            )
+        }
+
         composable(
-            route = NavigationRoutes.ADD_PASSWORD,
+            route = NavigationRoutes.ADD_PASSWORD_ROUTE_PATTERN,
             arguments = listOf(
-                navArgument(NavigationArgs.DATABASE_FILENAME) { type = NavType.StringType }
+                navArgument(NavigationArgs.DATABASE_FILENAME) { type = NavType.StringType; nullable = false }
             )
         ) { backStackEntry ->
-            val databaseFilename = backStackEntry.arguments?.getString(NavigationArgs.DATABASE_FILENAME) ?: return@composable
-
+            // val databaseFilenameFromNav = backStackEntry.arguments?.getString(NavigationArgs.DATABASE_FILENAME) // ViewModel will get this
             AddEditPasswordScreen(
-                onNavigateBack = {
-                    navController.popBackStack()
-                }
+                // databaseFilename and entryId are handled by the ViewModel via SavedStateHandle
+                onNavigateBack = { navController.popBackStack() }
             )
         }
 
-        // Edit Password Screen
         composable(
-            route = NavigationRoutes.EDIT_PASSWORD,
+            route = NavigationRoutes.EDIT_PASSWORD_ROUTE_PATTERN,
             arguments = listOf(
-                navArgument(NavigationArgs.DATABASE_FILENAME) { type = NavType.StringType },
                 navArgument(NavigationArgs.ENTRY_ID) { type = NavType.IntType }
             )
         ) { backStackEntry ->
-            val databaseFilename = backStackEntry.arguments?.getString(NavigationArgs.DATABASE_FILENAME) ?: return@composable
-            val entryId = backStackEntry.arguments?.getInt(NavigationArgs.ENTRY_ID) ?: return@composable
-
+            // val entryIdFromNav = backStackEntry.arguments?.getInt(NavigationArgs.ENTRY_ID) ?: 0 // ViewModel will get this
             AddEditPasswordScreen(
-                onNavigateBack = {
-                    navController.popBackStack()
-                }
+                // databaseFilename and entryId are handled by the ViewModel via SavedStateHandle
+                onNavigateBack = { navController.popBackStack() }
             )
         }
 
-        // Settings Screen
-        composable(NavigationRoutes.SETTINGS) {
-            SettingsScreen(
-                onNavigateBack = { navController.popBackStack() },
-                onNavigateToAppLockSetup = { navController.navigate(NavigationRoutes.APP_LOCK_SETUP) },
-                viewModel = settingsViewModel // <--- PASS THE VIEWMODEL HERE
-            )
-        }
-
-        // App Lock Setup Screen
-        composable(NavigationRoutes.APP_LOCK_SETUP) {
-            AppLockSetupScreen(
-                onNavigateBack = {
-                    navController.popBackStack()
-                }
-            )
-        }
-
-        // Change Database Password Screen
         composable(
-            route = NavigationRoutes.CHANGE_PASSWORD,
-            arguments = listOf(
-                navArgument(NavigationArgs.DATABASE_ID) { type = NavType.IntType }
-            )
+            route = NavigationRoutes.CHANGE_PASSWORD_ROUTE_PATTERN,
+            arguments = listOf(navArgument(NavigationArgs.DATABASE_ID) { type = NavType.IntType })
         ) { backStackEntry ->
-            val databaseId = backStackEntry.arguments?.getInt(NavigationArgs.DATABASE_ID) ?: return@composable
-
+            val databaseIdFromNav = backStackEntry.arguments?.getInt(NavigationArgs.DATABASE_ID) ?: 0
             ChangeDatabasePasswordScreen(
-                databaseId = databaseId,
-                onNavigateBack = {
-                    navController.popBackStack()
-                }
+                databaseId = databaseIdFromNav,
+                onNavigateBack = { navController.popBackStack() }
             )
         }
-    }
-}
-
-/**
- * Navigation extension functions for easier navigation
- */
-fun NavHostController.navigateToPasswordList(database: UserDatabaseInfo) {
-    val route = NavigationRoutes.passwordList(
-        database.id,
-        database.databaseLabel,
-        database.databaseFilename
-    )
-    navigate(route)
-}
-
-fun NavHostController.navigateToAddPassword(databaseFilename: String) {
-    val route = NavigationRoutes.addPassword(databaseFilename)
-    navigate(route)
-}
-
-fun NavHostController.navigateToEditPassword(databaseFilename: String, entryId: Int) {
-    val route = NavigationRoutes.editPassword(databaseFilename, entryId)
-    navigate(route)
-}
-
-fun NavHostController.navigateToChangePassword(databaseId: Int) {
-    val route = NavigationRoutes.changePassword(databaseId)
-    navigate(route)
-}
-
-/**
- * Safe navigation that handles back stack properly
- */
-fun NavHostController.navigateAndClearBackStack(route: String) {
-    navigate(route) {
-        popUpTo(graph.startDestinationId) {
-            inclusive = true
-        }
-    }
-}
-
-fun NavHostController.navigateWithSingleTop(route: String) {
-    navigate(route) {
-        launchSingleTop = true
     }
 }

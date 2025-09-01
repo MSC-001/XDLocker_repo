@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.util.Base64
 import androidx.core.content.edit // KTX for SharedPreferences
+// Removed: import androidx.preference.contains // This was unused and causing confusion
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.security.SecureRandom
 import java.security.spec.KeySpec
@@ -118,8 +119,9 @@ class AppLockManagerImpl @Inject constructor(
         }
     }
 
-    override suspend fun isPinConfigured(): Boolean {
-        return prefs.getBoolean(KEY_PIN_CONFIGURED, false)
+    override fun isPinConfigured(): Boolean {
+        // Corrected to use 'prefs' and 'KEY_PIN_CONFIGURED'
+        return prefs.contains(KEY_PIN_CONFIGURED)
     }
 
     private fun generateSalt(): ByteArray {
