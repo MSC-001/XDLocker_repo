@@ -20,7 +20,6 @@ fun PasswordEntryCard(
     entry: PasswordEntry,
     onClick: () -> Unit,
     onFavoriteToggle: () -> Unit,
-    onCopyUsername: () -> Unit,
     onCopyPassword: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier
@@ -123,12 +122,7 @@ fun PasswordEntryCard(
                                 onClick = { showMenu = false; onClick() },
                                 leadingIcon = { Icon(Icons.Default.Edit, null) }
                             )
-                            DropdownMenuItem(
-                                text = { Text("Copy Username") },
-                                onClick = { showMenu = false; onCopyUsername() },
-                                leadingIcon = { Icon(Icons.Default.Person, null) },
-                                enabled = entry.username.isNotBlank()
-                            )
+                            // DropdownMenuItem for "Copy Username" removed
                             DropdownMenuItem(
                                 text = { Text("Copy Password") },
                                 onClick = { showMenu = false; onCopyPassword() },

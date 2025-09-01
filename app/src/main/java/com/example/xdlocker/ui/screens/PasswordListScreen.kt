@@ -196,10 +196,7 @@ fun PasswordListScreen(
                                     entry = entry,
                                     onClick = { onNavigateToEditPassword(entry) },
                                     onFavoriteToggle = { viewModel.toggleFavorite(entry) },
-                                    onCopyUsername = {
-                                        clipboardManager.setText(AnnotatedString(entry.username))
-                                        viewModel.copyToClipboard(entry.username, "Username")
-                                    },
+                                    // onCopyUsername lambda removed
                                     onCopyPassword = {
                                         clipboardManager.setText(AnnotatedString(entry.password))
                                         viewModel.copyToClipboard(entry.password, "Password")
