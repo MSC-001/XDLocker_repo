@@ -4,18 +4,16 @@ import android.content.Context
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
-// import androidx.sqlite.db.SupportSQLiteOpenHelper // This import is not strictly necessary if not directly used.
-import net.sqlcipher.database.SupportFactory // <- UPDATED IMPORT
+import net.zetetic.database.sqlcipher.SupportOpenHelperFactory // <- NEW IMPORT
 
 object SQLCipherHelper {
 
     /*
      Creates a SupportFactory for SQLCipher encryption
-      //@param password The encryption password for the database
      */
-    fun createSupportFactory(password: String): SupportFactory {
+    fun createSupportFactory(password: String): SupportOpenHelperFactory { // <- UPDATED FUNCTION SIGNATURE
         val passphrase = password.toByteArray()
-        return SupportFactory(passphrase)
+        return SupportOpenHelperFactory(passphrase)
     }
 
     /**
@@ -37,9 +35,6 @@ object SQLCipherHelper {
                 .build()
 
             // Try to perform a simple query
-            // Note: tempDb.passwordEntryDao().getEntryCount() was flagged as a suspend function call.
-            // This is a separate issue we should address if it persists after dependency fixes.
-            // For now, let's assume it works or will be fixed.
             tempDb.query("SELECT COUNT(*) FROM password_entries", null) // A simple raw query
             tempDb.close()
             true

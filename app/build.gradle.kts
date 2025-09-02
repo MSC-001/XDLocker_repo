@@ -1,19 +1,20 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.jetbrains.kotlin.android)
-    alias(libs.plugins.kotlin.kapt)
+    alias(libs.plugins.ksp) // Replaced kapt with ksp
     alias(libs.plugins.hilt.android)
+    alias(libs.plugins.jetbrains.kotlin.compose)
     id("kotlin-parcelize")
 }
 
 android {
     namespace = "com.example.xdlocker"
-    compileSdk = 34
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.example.xdlocker"
         minSdk = 26
-        targetSdk = 34
+        targetSdk = 36
         versionCode = 1
         versionName = "1.0"
 
@@ -34,21 +35,23 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        sourceCompatibility = JavaVersion.VERSION_11 // Or VERSION_17
+        targetCompatibility = JavaVersion.VERSION_11 // Or VERSION_17
     }
 
     kotlinOptions {
-        jvmTarget = "1.8"
+        jvmTarget = "11"
     }
 
     buildFeatures {
         compose = true
     }
 
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.8"
-    }
+    // Remove the explicit composeOptions block if you are using the Compose Compiler plugin
+    // The plugin handles the compiler extension version automatically based on its own version.
+    // composeOptions {
+    //     kotlinCompilerExtensionVersion = "1.5.8" 
+    // }
 
     packaging {
         resources {
@@ -84,7 +87,7 @@ dependencies {
     // Room Database
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
-    kapt(libs.androidx.room.compiler)
+    ksp(libs.androidx.room.compiler) // Changed from kapt to ksp
 
     // SQLCipher for encryption
     implementation(libs.sqlcipher)
@@ -93,7 +96,7 @@ dependencies {
     // Dependency Injection (Hilt)
     implementation(libs.hilt.android)
     implementation(libs.androidx.hilt.navigation.compose)
-    kapt(libs.hilt.compiler)
+    ksp(libs.hilt.compiler) // Changed from kapt to ksp
 
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)

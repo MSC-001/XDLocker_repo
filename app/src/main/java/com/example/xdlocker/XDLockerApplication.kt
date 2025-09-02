@@ -2,13 +2,16 @@ package com.example.xdlocker
 
 import android.app.Application
 import dagger.hilt.android.HiltAndroidApp
-import net.sqlcipher.database.SQLiteDatabase
+import net.zetetic.database.sqlcipher.SQLiteDatabase
 
 @HiltAndroidApp
 class XDLockerApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+
+        // Load SQLCipher native libraries
+        System.loadLibrary("sqlcipher")
 
         // Initialize other components if needed
         initializeApp()
