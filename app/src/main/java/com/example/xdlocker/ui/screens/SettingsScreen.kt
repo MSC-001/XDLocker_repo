@@ -2,6 +2,7 @@ package com.example.xdlocker.ui.screens
 
 import android.widget.Toast
 import androidx.compose.foundation.layout.*
+// import androidx.compose.ui.Alignment // Removed unused import
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -11,10 +12,9 @@ import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
@@ -43,9 +43,17 @@ fun SettingsScreen(
     var showSortOrderDialog by remember { mutableStateOf(false) }
     var showAutoLockDialog by remember { mutableStateOf(false) }
     var showRemovePinDialog by remember { mutableStateOf(false) }
-    var pinInputForRemoval by remember { mutableStateOf("") }
 
-    // Observe lifecycle to refresh UI state on resume
+    // State for RemovePinDialog
+    var pinInputForRemoval by rememberSaveable { mutableStateOf("") }
+
+    // State for ClearDataDialog
+    var clearDataConfirmationStep by rememberSaveable { mutableStateOf(0) } // 0: idle, 1: step 1, 2: step 2, 3: step 3
+    var pinForClearDataDialog by rememberSaveable { mutableStateOf("") }
+    var clearDataDialogError by remember { mutableStateOf<String?>(null) }
+    var isClearDataStepLoading by remember { mutableStateOf(false) }
+
+
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner, viewModel) {
         val observer = LifecycleEventObserver { _, event ->
@@ -58,6 +66,29 @@ fun SettingsScreen(
             lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
+
+    LaunchedEffect(uiState.showClearSuccess) {
+        if (uiState.showClearSuccess) {
+            Toast.makeText(context, "All data cleared successfully!", Toast.LENGTH_LONG).show()
+            showClearDataDialog = false
+            clearDataConfirmationStep = 0
+            pinForClearDataDialog = ""
+            clearDataDialogError = null
+            isClearDataStepLoading = false
+            viewModel.clearSuccessMessages()
+            viewModel.clearError() // Clear global error from viewmodel
+            viewModel.refreshAppLockStatus()
+        }
+    }
+
+    LaunchedEffect(uiState.error) {
+        // If the dialog is on its final step and a global error appears from clearAllData
+        if (showClearDataDialog && clearDataConfirmationStep == 3 && uiState.error != null) {
+            clearDataDialogError = uiState.error
+            isClearDataStepLoading = false // Ensure local step loading stops if global error takes over
+        }
+    }
+
 
     Scaffold(
         topBar = {
@@ -77,17 +108,15 @@ fun SettingsScreen(
                 .padding(paddingValues)
                 .verticalScroll(scrollState)
         ) {
-            // Security Section
             SettingsSection(title = "Security") {
-                // App Lock
                 SettingsItem(
                     title = "App Lock",
                     subtitle = if (uiState.isAppLockEnabled) "Enabled" else "Disabled",
                     icon = Icons.Default.Lock,
                     onClick = {
                         if (uiState.isAppLockEnabled) {
-                            pinInputForRemoval = "" // Reset PIN input
-                            viewModel.clearError() // Clear previous errors if any
+                            pinInputForRemoval = ""
+                            viewModel.clearError()
                             showRemovePinDialog = true
                         } else {
                             onNavigateToAppLockSetup()
@@ -96,7 +125,6 @@ fun SettingsScreen(
                     trailing = null
                 )
 
-                // Biometric Authentication
                 if (uiState.isAppLockEnabled) {
                     SettingsItem(
                         title = "Biometric Authentication",
@@ -110,8 +138,6 @@ fun SettingsScreen(
                             )
                         }
                     )
-
-                    // Auto Lock Timeout
                     SettingsItem(
                         title = "Auto Lock",
                         subtitle = "Lock after ${uiState.autoLockTimeoutMinutes} minutes of inactivity",
@@ -121,9 +147,7 @@ fun SettingsScreen(
                 }
             }
 
-            // Appearance Section
             SettingsSection(title = "Appearance") {
-                // Dark Theme
                 SettingsItem(
                     title = "Dark Theme",
                     subtitle = if (uiState.isDarkTheme) "Enabled" else "Use system setting",
@@ -136,8 +160,6 @@ fun SettingsScreen(
                         )
                     }
                 )
-
-                // Default Sort Order
                 SettingsItem(
                     title = "Default Sort Order",
                     subtitle = uiState.defaultSortOrder,
@@ -146,53 +168,47 @@ fun SettingsScreen(
                 )
             }
 
-            // Data Management Section
             SettingsSection(title = "Data Management") {
-                // Export Data
                 SettingsItem(
                     title = "Export Data",
                     subtitle = "Export all databases and settings",
                     icon = Icons.Default.FileDownload,
                     onClick = { showExportDialog = true }
                 )
-
-                // Import Data
                 SettingsItem(
                     title = "Import Data",
                     subtitle = "Import from backup file",
                     icon = Icons.Default.FileUpload,
                     onClick = { showImportDialog = true }
                 )
-
-                // Clear All Data
                 SettingsItem(
                     title = "Clear All Data",
                     subtitle = "Delete all databases and reset app",
                     icon = Icons.Default.DeleteForever,
-                    onClick = { showClearDataDialog = true },
+                    onClick = {
+                        viewModel.clearError()      // Clear global ViewModel error first
+                        clearDataDialogError = null // Clear local dialog error
+                        pinForClearDataDialog = ""  // Reset PIN input
+                        isClearDataStepLoading = false // Reset step loading
+                        clearDataConfirmationStep = 1 // Start confirmation flow from step 1
+                        showClearDataDialog = true
+                    },
                     isDestructive = true
                 )
             }
-
-            // About Section
             SettingsSection(title = "About") {
-                // App Version
                 SettingsItem(
                     title = "Version",
                     subtitle = viewModel.getAppVersion(),
                     icon = Icons.Default.Info,
                     onClick = { /* Show version details */ }
                 )
-
-                // Open Source Licenses
                 SettingsItem(
                     title = "Open Source Licenses",
                     subtitle = "View third-party licenses",
                     icon = Icons.Default.Code,
                     onClick = { /* Show licenses */ }
                 )
-
-                // Privacy Policy
                 SettingsItem(
                     title = "Privacy Policy",
                     subtitle = "How we handle your data",
@@ -202,10 +218,9 @@ fun SettingsScreen(
             }
 
             Spacer(modifier = Modifier.height(32.dp))
-        } // End Column
-    } // End Scaffold
+        }
+    }
 
-    // Dialogs
     if (showSortOrderDialog) {
         SortOrderDialog(
             currentSortOrder = uiState.defaultSortOrder,
@@ -233,7 +248,7 @@ fun SettingsScreen(
     if (showExportDialog) {
         ExportDataDialog(
             onExport = {
-                viewModel.exportData { /* exportData -> Handle export data */ }
+                viewModel.exportData(/* Pass any necessary params or callbacks */)
                 showExportDialog = false
             },
             onDismiss = { showExportDialog = false },
@@ -244,7 +259,7 @@ fun SettingsScreen(
     if (showImportDialog) {
         ImportDataDialog(
             onImport = { data ->
-                viewModel.importData(data) { /* Handle import success */ }
+                viewModel.importData(/* Pass data and any callbacks */)
                 showImportDialog = false
             },
             onDismiss = { showImportDialog = false },
@@ -252,25 +267,65 @@ fun SettingsScreen(
         )
     }
 
-    if (showClearDataDialog) {
-        ClearDataDialog(
-            requirePin = uiState.isAppLockEnabled,
-            onConfirm = { pin ->
-                viewModel.clearAllData(pin) { /* Handle clear success */ }
-                showClearDataDialog = false
+    if (showClearDataDialog && clearDataConfirmationStep > 0) {
+        val stepToExecute = clearDataConfirmationStep // Capture for the lambda
+        ClearDataDialogInternal(
+            currentStep = stepToExecute,
+            isAppLockEnabled = uiState.isAppLockEnabled,
+            pinInput = pinForClearDataDialog,
+            onPinInputChange = { pinForClearDataDialog = it },
+            dialogError = clearDataDialogError,
+            isLoadingViewModel = uiState.isLoading, // From ViewModel, for final clearAllData call
+            isStepLoading = isClearDataStepLoading, // Local loading for intermediate PIN checks
+            onConfirm = {
+                val currentStepVal = stepToExecute // Use captured stepToExecute for consistency in this lambda
+                val isAppLockEnabledVal = uiState.isAppLockEnabled // Capture current state
+                val pinForDialogVal = pinForClearDataDialog // Capture current PIN input
+
+                isClearDataStepLoading = true
+                clearDataDialogError = null // Clear previous step error
+
+                if (isAppLockEnabledVal) { // Use captured state
+                    viewModel.verifyPinForConfirmationStep(pinForDialogVal) { success, errorMsg ->
+                        if (success) {
+                            if (currentStepVal < 3) {
+                                clearDataConfirmationStep++
+                                pinForClearDataDialog = "" // Clear PIN for next step's input
+                            } else { // Final step (Step 3)
+                                viewModel.clearAllData(pinForDialogVal) // Pass the last verified PIN
+                            }
+                        } else {
+                            clearDataDialogError = errorMsg
+                        }
+                        isClearDataStepLoading = false // Stop step loading after verification attempt
+                    }
+                } else { // No App Lock Enabled (or perceived as OFF by current uiState)
+                    isClearDataStepLoading = false // No async op for no-PIN steps
+                    if (currentStepVal < 3) {
+                        clearDataConfirmationStep++
+                    } else { // Final step (Step 3)
+                        viewModel.clearAllData("")
+                    }
+                }
             },
-            onDismiss = { showClearDataDialog = false },
-            isLoading = uiState.isLoading
+            onDismiss = {
+                showClearDataDialog = false
+                clearDataConfirmationStep = 0
+                pinForClearDataDialog = ""
+                clearDataDialogError = null
+                isClearDataStepLoading = false
+                viewModel.clearError() // Clear global error from viewmodel if any
+            }
         )
     }
 
     if (showRemovePinDialog) {
         RemovePinDialog(
-            pinInput = pinInputForRemoval,
+            pinInput = pinInputForRemoval, // This is used here
             onPinInputChange = { pinInputForRemoval = it },
             onDismiss = {
                 showRemovePinDialog = false
-                viewModel.clearError() // Clear error on dismiss
+                viewModel.clearError()
             },
             onConfirm = {
                 if (pinInputForRemoval.isNotBlank()) {
@@ -278,13 +333,10 @@ fun SettingsScreen(
                         pin = pinInputForRemoval,
                         onSuccess = {
                             showRemovePinDialog = false
-                            viewModel.refreshAppLockStatus() // Explicitly refresh
+                            viewModel.refreshAppLockStatus()
                             Toast.makeText(context, "App Lock Disabled", Toast.LENGTH_SHORT).show()
                         },
                     )
-                } else {
-                    // Optionally, show a local error if PIN is blank, though ViewModel should handle it too
-                    // viewModel.setError("PIN cannot be empty") // Example
                 }
             },
             error = uiState.error
@@ -292,11 +344,11 @@ fun SettingsScreen(
     }
 }
 
+// Helper composables (SettingsSection, SettingsItem, dialogs etc.)
+// These are assumed to be complete in the user's actual file.
+
 @Composable
-private fun SettingsSection(
-    title: String,
-    content: @Composable () -> Unit
-) {
+private fun SettingsSection(title: String, content: @Composable () -> Unit) {
     Column {
         Text(
             text = title,
@@ -320,7 +372,7 @@ private fun SettingsSection(
 private fun SettingsItem(
     title: String,
     subtitle: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     onClick: () -> Unit,
     trailing: @Composable (() -> Unit)? = null,
     isDestructive: Boolean = false
@@ -333,7 +385,7 @@ private fun SettingsItem(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
         ) {
             Icon(
                 imageVector = icon,
@@ -375,7 +427,7 @@ private fun SortOrderDialog(
                 sortOrders.forEach { sortOrder ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
                     ) {
                         RadioButton(
                             selected = sortOrder == currentSortOrder,
@@ -410,7 +462,7 @@ private fun AutoLockDialog(
                 timeoutOptions.forEach { timeout ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
                     ) {
                         RadioButton(
                             selected = timeout == currentTimeout,
@@ -507,67 +559,114 @@ private fun ImportDataDialog(
 }
 
 @Composable
-private fun ClearDataDialog(
-    requirePin: Boolean,
-    onConfirm: (String) -> Unit,
-    onDismiss: () -> Unit,
-    isLoading: Boolean
+private fun ClearDataDialogInternal(
+    currentStep: Int,
+    isAppLockEnabled: Boolean,
+    pinInput: String,
+    onPinInputChange: (String) -> Unit,
+    dialogError: String?,
+    isLoadingViewModel: Boolean,
+    isStepLoading: Boolean,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
 ) {
-    var pin by remember { mutableStateOf("") }
+    val dialogTitle: String
+    val confirmButtonText: String
+
+    // Determine title and confirm button text based on current step
+    when (currentStep) {
+        1 -> {
+            dialogTitle = "Clear All Data (Step 1 of 3)"
+            confirmButtonText = "Confirm Step 1"
+        }
+        2 -> {
+            dialogTitle = "Clear All Data (Step 2 of 3)"
+            confirmButtonText = "Confirm Step 2"
+        }
+        3 -> {
+            dialogTitle = "FINAL WARNING (Step 3 of 3)"
+            confirmButtonText = "CLEAR ALL DATA"
+        }
+        else -> {
+            onDismiss() // Should not happen if dialog is only shown for steps 1-3
+            return
+        }
+    }
+
+    val actualIsLoading = if (currentStep == 3) isLoadingViewModel else isStepLoading
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Clear All Data") },
+        title = { Text(dialogTitle) },
         text = {
             Column {
-                Text(
-                    "This will permanently delete ALL databases and reset the app to its initial state.",
-                    color = MaterialTheme.colorScheme.error,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text("This action cannot be undone!")
+                // Determine text content based on current step
+                when (currentStep) {
+                    1 -> {
+                        Text("This will permanently delete ALL user databases and reset the app.")
+                        if (isAppLockEnabled) Spacer(modifier = Modifier.height(8.dp))
+                        Text("This action cannot be undone. Please confirm to proceed.")
+                    }
+                    2 -> {
+                        Text("SECOND CONFIRMATION: You are about to delete all data.")
+                        if (isAppLockEnabled) Spacer(modifier = Modifier.height(8.dp))
+                        Text("Are you absolutely sure you wish to continue?")
+                    }
+                    3 -> {
+                        Text("ALL YOUR DATA WILL BE PERMANENTLY DELETED.", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                        if (isAppLockEnabled) Spacer(modifier = Modifier.height(8.dp))
+                        Text("There is no going back after this step.")
+                    }
+                }
 
-                if (requirePin) {
+                if (isAppLockEnabled) {
                     Spacer(modifier = Modifier.height(16.dp))
                     OutlinedTextField(
-                        value = pin,
-                        onValueChange = { pin = it },
-                        label = { Text("Enter PIN to confirm") },
+                        value = pinInput,
+                        onValueChange = onPinInputChange,
+                        label = { Text("Enter PIN (Step $currentStep of 3)") },
                         modifier = Modifier.fillMaxWidth(),
                         visualTransformation = PasswordVisualTransformation(),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword)
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                        isError = dialogError != null,
+                        singleLine = true,
+                        enabled = !actualIsLoading
                     )
+                    if (dialogError != null) {
+                        Text(
+                            text = dialogError,
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
                 }
             }
         },
         confirmButton = {
             Button(
-                onClick = { onConfirm(pin) },
-                enabled = (!requirePin || pin.isNotBlank()) && !isLoading,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.error
-                )
+                onClick = onConfirm,
+                enabled = (if (isAppLockEnabled) pinInput.isNotBlank() else true) && !actualIsLoading,
+                colors = if (currentStep == 3) ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error) else ButtonDefaults.buttonColors()
             ) {
-                if (isLoading) {
+                if (actualIsLoading) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(16.dp),
-                        color = MaterialTheme.colorScheme.onError
+                        color = if (currentStep == 3) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.onPrimary
                     )
                 } else {
-                    Text("Clear All Data")
+                    Text(confirmButtonText)
                 }
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss, enabled = !isLoading) {
+            TextButton(onClick = onDismiss, enabled = !actualIsLoading) {
                 Text("Cancel")
             }
         }
     )
 }
 
-// Dialog to remove PIN
 @Composable
 private fun RemovePinDialog(
     pinInput: String,
@@ -613,4 +712,3 @@ private fun RemovePinDialog(
         }
     )
 }
-

@@ -34,4 +34,11 @@ interface AppLockManager {
      * Returns true if a PIN is set, false otherwise.
      */
     fun isPinConfigured(): Boolean
+
+    /**
+     * Forcibly clears all PIN configuration data (hashed PIN, salt, configured flag).
+     * This method does not require the current PIN and is used for administrative resets,
+     * such as after clearing all application data.
+     */
+    fun forceClearPinConfiguration()
 }

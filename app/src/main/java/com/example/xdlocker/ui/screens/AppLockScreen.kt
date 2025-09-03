@@ -10,11 +10,11 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.MaterialTheme // Added import
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -22,6 +22,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.xdlocker.viewmodel.AppLockViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle // Ensured import is present
 
 @Composable
 fun AppLockScreen(
@@ -29,15 +30,13 @@ fun AppLockScreen(
     viewModel: AppLockViewModel = hiltViewModel()
 ) {
     var pin by remember { mutableStateOf("") }
-    val coroutineScope = rememberCoroutineScope()
-    // You might want to collect some state from the ViewModel, e.g., error messages
-    // val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    Scaffold {
+    Scaffold { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(it) // Apply padding from Scaffold
+                .padding(paddingValues)
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
@@ -46,16 +45,16 @@ fun AppLockScreen(
             Spacer(modifier = Modifier.height(16.dp))
             OutlinedTextField(
                 value = pin,
-                onValueChange = { pin = it },
+                onValueChange = { newValue -> pin = newValue }, // Clarified lambda parameter
                 label = { Text("PIN") },
                 visualTransformation = PasswordVisualTransformation(),
                 singleLine = true
             )
             Spacer(modifier = Modifier.height(16.dp))
-            // if (uiState.errorMessage != null) {
-            //     Text(uiState.errorMessage, color = MaterialTheme.colorScheme.error)
-            //     Spacer(modifier = Modifier.height(8.dp))
-            // }
+            if (uiState.errorMessage != null) {
+                 Text(text = uiState.errorMessage!!, color = MaterialTheme.colorScheme.error)
+                 Spacer(modifier = Modifier.height(8.dp))
+            }
             Button(
                 onClick = {
                     viewModel.verifyPin(pin, onUnlockSuccess)

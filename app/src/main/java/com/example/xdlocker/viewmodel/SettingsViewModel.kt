@@ -1,9 +1,14 @@
 package com.example.xdlocker.viewmodel
 
 import android.content.Context
+import android.util.Log // Added for logging
 import androidx.appcompat.app.AppCompatDelegate
+import androidx.core.content.edit // For SharedPreferences KTX
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.xdlocker.data.dao.UserDatabaseInfoDao
+import com.example.xdlocker.data.database.SQLCipherHelper
+import com.example.xdlocker.data.entities.UserDatabaseInfo
 import com.example.xdlocker.data.repository.MetadataRepository
 import com.example.xdlocker.security.AppLockManager
 import com.example.xdlocker.security.PinResult
@@ -19,9 +24,10 @@ import javax.inject.Inject
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
-    private val metadataRepository: MetadataRepository, // Keep for export/import/clearAllData
-    @ApplicationContext private val context: Context, // Keep for SharedPreferences
-    private val appLockManager: AppLockManager
+    private val metadataRepository: MetadataRepository,
+    @ApplicationContext private val context: Context,
+    private val appLockManager: AppLockManager,
+    private val userDatabaseInfoDao: UserDatabaseInfoDao
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -29,19 +35,19 @@ class SettingsViewModel @Inject constructor(
 
     companion object {
         private const val APP_SETTINGS_PREFS = "app_settings_prefs"
+        private const val TAG = "SettingsViewModel" // Logging Tag
     }
 
+    // ... (other methods remain the same) ...
     init {
         loadSettings()
     }
 
     private fun loadSettings() {
         viewModelScope.launch {
-            // App Lock Status from AppLockManager
             val isPinActuallyConfigured = appLockManager.isPinConfigured()
             _uiState.update { it.copy(isAppLockEnabled = isPinActuallyConfigured) }
 
-            // --- Dark Theme ---
             val isDarkThemeEnabled = getPreference("dark_theme", false) as? Boolean ?: false
             if (isDarkThemeEnabled) {
                 AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
@@ -49,11 +55,8 @@ class SettingsViewModel @Inject constructor(
                 AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
             }
 
-            // --- Other Settings ---
             val savedBiometricPref = getPreference("biometric_enabled", false) as? Boolean ?: false
-            // Ensure biometric is off if app lock is off, even if preference says otherwise
             val actualBiometricEnabled = if (isPinActuallyConfigured) savedBiometricPref else false
-
             val autoLockTimeoutMinutes = getPreference("auto_lock_timeout", 5) as? Int ?: 5
             val defaultSortOrder = getPreference("default_sort_order", "Title (A-Z)") as? String ?: "Title (A-Z)"
 
@@ -63,7 +66,6 @@ class SettingsViewModel @Inject constructor(
                     isBiometricEnabled = actualBiometricEnabled,
                     autoLockTimeoutMinutes = autoLockTimeoutMinutes,
                     defaultSortOrder = defaultSortOrder
-                    // isAppLockEnabled is already set from appLockManager
                 )
             }
         }
@@ -110,22 +112,11 @@ class SettingsViewModel @Inject constructor(
             when (val result = appLockManager.setupPin(pin)) {
                 is PinResult.Success -> {
                     _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            isAppLockEnabled = true,
-                            showSetupSuccess = true
-                        )
-                    } // Keep for quick UI hints if needed
+                        it.copy(isLoading = false, isAppLockEnabled = true, showSetupSuccess = true)
+                    }
                     onSuccess()
                 }
-                is PinResult.Error -> {
-                    _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            error = result.message
-                        )
-                    }
-                }
+                is PinResult.Error -> _uiState.update { it.copy(isLoading = false, error = result.message) }
             }
         }
     }
@@ -133,40 +124,10 @@ class SettingsViewModel @Inject constructor(
     fun refreshAppLockStatus() {
         viewModelScope.launch {
             val isPinActuallyConfigured = appLockManager.isPinConfigured()
-            // We also need to consider the biometric status in relation to the app lock
             val savedBiometricPref = getPreference("biometric_enabled", false) as? Boolean ?: false
             val actualBiometricEnabled = if (isPinActuallyConfigured) savedBiometricPref else false
-
             _uiState.update { currentState ->
-                currentState.copy(
-                    isAppLockEnabled = isPinActuallyConfigured,
-                    isBiometricEnabled = actualBiometricEnabled
-                )
-            }
-        }
-    }
-
-    fun changeAppLockPin(oldPin: String, newPin: String, onSuccess: () -> Unit) {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null) }
-            when (val result = appLockManager.changePin(oldPin, newPin)) {
-                is PinResult.Success -> {
-                    _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            showChangeSuccess = true
-                        )
-                    }
-                    onSuccess()
-                }
-                is PinResult.Error -> {
-                    _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            error = result.message
-                        )
-                    }
-                }
+                currentState.copy(isAppLockEnabled = isPinActuallyConfigured, isBiometricEnabled = actualBiometricEnabled)
             }
         }
     }
@@ -177,70 +138,126 @@ class SettingsViewModel @Inject constructor(
             when (val result = appLockManager.removePin(pin)) {
                 is PinResult.Success -> {
                     _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            isAppLockEnabled = false,
-                            isBiometricEnabled = false, // Also disable biometric when PIN is removed
-                            showRemoveSuccess = true
-                        )
+                        it.copy(isLoading = false, isAppLockEnabled = false, isBiometricEnabled = false, showRemoveSuccess = true)
                     }
                     savePreference("biometric_enabled", false)
                     onSuccess()
                 }
+                is PinResult.Error -> _uiState.update { it.copy(isLoading = false, error = result.message) }
+            }
+        }
+    }
+
+    fun verifyPinForConfirmationStep(pin: String, onResult: (success: Boolean, errorMessage: String?) -> Unit) {
+        viewModelScope.launch {
+            when (val result = appLockManager.verifyPin(pin)) {
+                is PinResult.Success -> {
+                    onResult(result.data, if (result.data) null else "Incorrect PIN")
+                }
                 is PinResult.Error -> {
-                    _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            error = result.message
-                        )
-                    }
+                    onResult(false, result.message ?: "PIN verification failed")
                 }
             }
         }
     }
 
-    fun exportData(onSuccess: (String) -> Unit) { /* ... no change ... */ }
-    fun importData(data: String, onSuccess: () -> Unit) { /* ... no change ... */ }
+    fun exportData(/* onSuccess: (String) -> Unit */) { /* ... implementation ... */ }
+    fun importData(/* data: String, onSuccess: () -> Unit */) { /* ... implementation ... */ }
 
-    fun clearAllData(pin: String, onSuccess: () -> Unit) {
+
+    fun clearAllData(pin: String) {
+        Log.d(TAG, "clearAllData called. AppLockEnabled: ${_uiState.value.isAppLockEnabled}, PIN provided: ${pin.isNotEmpty()}")
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null) }
-
-            if (_uiState.value.isAppLockEnabled) {
+            if (_uiState.value.isAppLockEnabled && pin.isNotEmpty()) {
+                Log.d(TAG, "Verifying PIN for final confirmation.")
                 when (val pinVerifyResult = appLockManager.verifyPin(pin)) {
                     is PinResult.Success -> {
                         if (!pinVerifyResult.data) {
-                            _uiState.update { it.copy(isLoading = false, error = "Incorrect PIN") }
+                            Log.w(TAG, "PIN verification FAILED for final step.")
+                            _uiState.update { it.copy(isLoading = false, error = "Incorrect PIN for final confirmation.") }
                             return@launch
                         }
-                        // PIN verified, proceed to clear data
+                        Log.i(TAG, "PIN verification SUCCESSFUL for final step.")
                     }
                     is PinResult.Error -> {
-                        _uiState.update { it.copy(isLoading = false, error = pinVerifyResult.message) }
+                        Log.e(TAG, "PIN verification ERROR for final step: ${pinVerifyResult.message}")
+                        _uiState.update { it.copy(isLoading = false, error = pinVerifyResult.message ?: "PIN verification failed for final step.") }
                         return@launch
                     }
                 }
-            } // else: App lock not enabled, no PIN verification needed
-
-            // Clear all data - this would delete all databases
-            // TODO: metadataRepository.clearAllDatabases() - this method needs to exist
-            // For now, simulating success
-            _uiState.update {
-                it.copy(
-                    isLoading = false,
-                    showClearSuccess = true
-                )
+            } else if (_uiState.value.isAppLockEnabled && pin.isEmpty()) {
+                Log.e(TAG, "App lock is enabled but clearAllData called with an empty PIN. This shouldn't happen after 3-step PIN confirm.")
+                _uiState.update { it.copy(isLoading = false, error = "Cannot clear data: PIN required but not provided for final step.")}
+                return@launch
+            } else {
+                Log.d(TAG, "No PIN verification needed or PIN already verified.")
             }
-            onSuccess()
-            // Consider also removing app lock PIN if all data is cleared
-            // appLockManager.removePin() - but this requires current PIN, which might be an issue if already verified
-            // Or have a specific method in AppLockManager like forceRemovePin()
+
+            _uiState.update { it.copy(isLoading = true, error = null) } // Clear previous errors, set loading
+            Log.d(TAG, "Starting data deletion process...")
+
+            try {
+                val databaseInfos: List<UserDatabaseInfo> = userDatabaseInfoDao.getAllDatabasesSuspend()
+                Log.d(TAG, "Found ${databaseInfos.size} user databases to clear.")
+
+                var allOperationsSuccessful = true
+
+                if (databaseInfos.isEmpty()) {
+                    Log.i(TAG, "No user databases found in DAO. Nothing to clear from file system or DAO based on this list.")
+                } else {
+                    for (dbInfo in databaseInfos) {
+                        val dbFilename = dbInfo.databaseFilename
+                        Log.d(TAG, "Processing database: $dbFilename (ID: ${dbInfo.id})")
+
+                        Log.d(TAG, "Attempting to delete database file: $dbFilename")
+                        val fileDeleted = SQLCipherHelper.deleteDatabase(context, dbFilename)
+                        if (fileDeleted) {
+                            Log.i(TAG, "Successfully deleted database file: $dbFilename (or it didn't exist).")
+                            try {
+                                Log.d(TAG, "Attempting to delete DAO entry for: $dbFilename")
+                                userDatabaseInfoDao.deleteDatabaseByFilename(dbFilename)
+                                Log.i(TAG, "Successfully deleted DAO entry for: $dbFilename")
+                            } catch (eDao: Exception) {
+                                Log.e(TAG, "Failed to delete DAO entry for: $dbFilename", eDao)
+                                allOperationsSuccessful = false
+                            }
+                        } else {
+                            Log.w(TAG, "Failed to delete database file: $dbFilename (as reported by SQLCipherHelper).")
+                            allOperationsSuccessful = false
+                        }
+                    }
+                }
+
+                if (allOperationsSuccessful) {
+                    Log.i(TAG, "All data clearing operations successful.")
+                    appLockManager.forceClearPinConfiguration()
+                    Log.i(TAG, "App lock configuration cleared.")
+                    savePreference("biometric_enabled", false)
+                    _uiState.update {
+                        it.copy(isLoading = false, showClearSuccess = true, isAppLockEnabled = false, isBiometricEnabled = false, error = null)
+                    }
+                } else {
+                    Log.w(TAG, "Not all data clearing operations were successful. App lock will still be reset.")
+                    appLockManager.forceClearPinConfiguration()
+                    savePreference("biometric_enabled", false)
+                    _uiState.update {
+                        it.copy(isLoading = false, error = "Failed to clear some or all data. App lock has been reset.", isAppLockEnabled = false, isBiometricEnabled = false)
+                    }
+                }
+
+            } catch (e: Exception) {
+                Log.e(TAG, "Exception during clearAllData process: ${e.message}", e)
+                appLockManager.forceClearPinConfiguration()
+                savePreference("biometric_enabled", false)
+                _uiState.update {
+                    it.copy(isLoading = false, error = "An error occurred: ${e.message}. App lock has been reset.", isAppLockEnabled = false, isBiometricEnabled = false)
+                }
+            }
         }
     }
-
     private fun savePreference(key: String, value: Any) {
         val prefs = context.getSharedPreferences(APP_SETTINGS_PREFS, Context.MODE_PRIVATE)
-        with(prefs.edit()) {
+        prefs.edit {
             when (value) {
                 is String -> putString(key, value)
                 is Int -> putInt(key, value)
@@ -249,7 +266,6 @@ class SettingsViewModel @Inject constructor(
                 is Long -> putLong(key, value)
                 else -> throw IllegalArgumentException("This type cannot be saved into SharedPreferences")
             }
-            apply() // Or commit() if you need synchronous saving
         }
     }
 
@@ -282,38 +298,22 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-
     fun getAppVersion(): String {
-        // TODO: Replace with actual app version retrieval, e.g., using BuildConfig.VERSION_NAME
-        // For now, returning a placeholder.
-        // try {
-        //     val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
-        //     return packageInfo.versionName
-        // } catch (e: PackageManager.NameNotFoundException) {
-        //     Log.e("SettingsViewModel", "Failed to get app version", e)
-        // }
         return "1.0.0 (Placeholder)"
     }
 
     fun getAvailableSortOrders(): List<String> {
         return listOf(
-            "Title (A-Z)",
-            "Title (Z-A)",
-            "Date Added (Newest First)",
-            "Date Added (Oldest First)",
-            "Last Modified (Newest First)",
-            "Last Modified (Oldest First)"
-            // Add other sort orders as needed
+            "Title (A-Z)", "Title (Z-A)",
+            "Date Added (Newest First)", "Date Added (Oldest First)",
+            "Last Modified (Newest First)", "Last Modified (Oldest First)"
         )
     }
 
     fun getAutoLockOptions(): List<Int> {
-        // Options in minutes. 0 could represent 'Immediately' or 'When screen is locked'
-        // A separate option for 'Never' could be handled if desired, though risky.
         return listOf(1, 2, 5, 10, 15, 30, 60)
     }
 }
-
 data class SettingsUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
@@ -329,3 +329,4 @@ data class SettingsUiState(
     val showImportSuccess: Boolean = false,
     val showClearSuccess: Boolean = false
 )
+

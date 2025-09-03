@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import com.example.xdlocker.data.dao.UserDatabaseInfoDao // Added import
 import com.example.xdlocker.data.database.DatabaseManager
 import com.example.xdlocker.utils.SecurityUtils
 import dagger.Module
@@ -25,6 +26,15 @@ object ApplicationModule {
     @Singleton
     fun provideDatabaseManager(@ApplicationContext context: Context): DatabaseManager {
         return DatabaseManager.getInstance(context)
+    }
+
+    /**
+     * Provides UserDatabaseInfoDao singleton by getting it from DatabaseManager
+     */
+    @Provides
+    @Singleton
+    fun provideUserDatabaseInfoDao(databaseManager: DatabaseManager): UserDatabaseInfoDao {
+        return databaseManager.getMetadataDao()
     }
 
     /**

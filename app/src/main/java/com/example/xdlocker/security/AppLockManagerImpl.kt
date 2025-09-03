@@ -124,6 +124,16 @@ class AppLockManagerImpl @Inject constructor(
         return prefs.contains(KEY_PIN_CONFIGURED)
     }
 
+    override fun forceClearPinConfiguration() {
+        prefs.edit {
+            remove(KEY_PIN_CONFIGURED)
+            remove(KEY_PIN_SALT)
+            remove(KEY_PIN_HASH)
+            // apply() is implicit with KTX edit {}
+        }
+        println("AppLockManagerImpl: PIN configuration forcibly cleared.")
+    }
+
     private fun generateSalt(): ByteArray {
         val random = SecureRandom()
         val salt = ByteArray(16)

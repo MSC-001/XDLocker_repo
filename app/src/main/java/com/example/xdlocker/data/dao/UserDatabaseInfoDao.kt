@@ -19,6 +19,10 @@ interface UserDatabaseInfoDao {
     @Query("SELECT * FROM user_databases ORDER BY created_at DESC")
     fun getAllDatabasesByCreationDate(): Flow<List<UserDatabaseInfo>>
 
+    // Get all user databases as a suspend function returning a List
+    @Query("SELECT * FROM user_databases")
+    suspend fun getAllDatabasesSuspend(): List<UserDatabaseInfo>
+
     // Get database by ID
     @Query("SELECT * FROM user_databases WHERE id = :databaseId")
     suspend fun getDatabaseById(databaseId: Int): UserDatabaseInfo?
