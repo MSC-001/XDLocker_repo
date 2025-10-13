@@ -30,7 +30,7 @@ fun PasswordListScreen(
     databaseInfo: UserDatabaseInfo,
     onNavigateBack: () -> Unit,
     onNavigateToAddPassword: () -> Unit,
-    onNavigateToEditPassword: (PasswordEntry) -> Unit,
+    onNavigateToEditPassword: (Int, String) -> Unit, // Modified lambda
     viewModel: PasswordListViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -194,7 +194,7 @@ fun PasswordListScreen(
                             items(passwordEntries) { entry ->
                                 PasswordEntryCard(
                                     entry = entry,
-                                    onClick = { onNavigateToEditPassword(entry) },
+                                    onClick = { onNavigateToEditPassword(entry.id, databaseInfo.databaseFilename) }, // Modified call
                                     onFavoriteToggle = { viewModel.toggleFavorite(entry) },
                                     // onCopyUsername lambda removed
                                     onCopyPassword = {

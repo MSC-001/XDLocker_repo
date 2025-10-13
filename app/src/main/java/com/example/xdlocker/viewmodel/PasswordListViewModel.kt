@@ -38,65 +38,68 @@ class PasswordListViewModel @Inject constructor(
     private val _showFavoritesOnly = MutableStateFlow(false)
     val showFavoritesOnly = _showFavoritesOnly.asStateFlow()
 
-    // Database connection filename
-    private var databaseFilename: String? = null
+    // Database connection filename as a reactive flow
+    private val databaseFilenameFlow = MutableStateFlow<String?>(null)
 
-    // Password entries flow with all filters applied
-    val passwordEntries = combine(
-        searchQuery,
-        selectedTag,
-        sortCriteria,
-        showFavoritesOnly
-    ) { query, tag, sort, favoritesOnly ->
-        databaseFilename?.let { filename ->
+    // Main password entries flow, reacts to db changes, search, and filters
+    @OptIn(kotlinx.coroutines.FlowPreview::class)
+    val passwordEntries: StateFlow<List<PasswordEntry>> = databaseFilenameFlow.flatMapLatest { filename ->
+        if (filename == null) {
+            flowOf(emptyList()) // If no db is open, emit an empty list
+        } else {
+            // Get the base flow of entries from the repository
             passwordRepository.getAllEntries(filename)
-                .filterEntriesByQuery(query)
-                .filterByTag(tag)
-                .filterFavorites(favoritesOnly)
-                .sortBy(sort)
+                .combine(_searchQuery) { entries, query ->
+                    if (query.isBlank()) entries else entries.filter {
+                        it.title.contains(query, ignoreCase = true) ||
+                        it.username.contains(query, ignoreCase = true) ||
+                        it.url.contains(query, ignoreCase = true)
+                    }
+                }
+                .combine(_selectedTag) { entries, tag ->
+                    if (tag == "All") entries else entries.filter { it.tag == tag }
+                }
+                .combine(_showFavoritesOnly) { entries, favoritesOnly ->
+                    if (!favoritesOnly) entries else entries.filter { it.isFavorite }
+                }
+                .combine(_sortCriteria) { entries, sort ->
+                    when (sort) {
+                        SortCriteria.TITLE_ASC -> entries.sortedBy { it.title.lowercase() }
+                        SortCriteria.TITLE_DESC -> entries.sortedByDescending { it.title.lowercase() }
+                        SortCriteria.DATE_CREATED_ASC -> entries.sortedBy { it.createdAt }
+                        SortCriteria.DATE_CREATED_DESC -> entries.sortedByDescending { it.createdAt }
+                        SortCriteria.DATE_UPDATED_ASC -> entries.sortedBy { it.updatedAt }
+                        SortCriteria.DATE_UPDATED_DESC -> entries.sortedByDescending { it.updatedAt }
+                        SortCriteria.FAVORITE_FIRST -> entries.sortedByDescending { it.isFavorite }
+                    }
+                }
                 .catch { error ->
                     _uiState.update { it.copy(error = error.message) }
-                    emit(emptyList())
+                    emit(emptyList()) // On error, emit empty list
                 }
-        } ?: flowOf(emptyList())
-    }.flatMapLatest { it }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
-        )
+        }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyList()
+    )
 
-    // Available tags
-    val availableTags = databaseFilename?.let { filename ->
-        passwordRepository.getAllTags(filename)
-            .map { tags -> listOf("All") + tags }
-            .stateIn(
-                scope = viewModelScope,
-                started = SharingStarted.WhileSubscribed(5000),
-                initialValue = listOf("All")
-            )
-    } ?: flowOf(listOf("All"))
 
-    // Entry statistics
-    val entryStatistics = databaseFilename?.let { filename ->
-        passwordRepository.getAllEntries(filename)
-            .getStatistics()
-            .stateIn(
-                scope = viewModelScope,
-                started = SharingStarted.WhileSubscribed(5000),
-                initialValue = null
-            )
-    }
+    // Available tags flow
+    @OptIn(kotlinx.coroutines.FlowPreview::class)
+    val availableTags: StateFlow<List<String>> = databaseFilenameFlow.flatMapLatest { filename ->
+        if (filename == null) {
+            flowOf(listOf("All"))
+        } else {
+            passwordRepository.getAllTags(filename)
+                .map { tags -> listOf("All") + tags.distinct().sorted() }
+        }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = listOf("All")
+    )
 
-    // Security statistics
-    val securityStats = databaseFilename?.let { filename ->
-        passwordRepository.getPasswordSecurityStats(filename)
-            .stateIn(
-                scope = viewModelScope,
-                started = SharingStarted.WhileSubscribed(5000),
-                initialValue = null
-            )
-    }
 
     fun openDatabase(databaseInfo: UserDatabaseInfo, password: String) {
         viewModelScope.launch {
@@ -106,7 +109,7 @@ class PasswordListViewModel @Inject constructor(
             result.fold(
                 onSuccess = { connection ->
                     _currentDatabase.value = databaseInfo
-                    databaseFilename = connection.filename
+                    databaseFilenameFlow.value = connection.filename // Update the flow
                     _uiState.update { it.copy(isLoading = false, isDatabaseOpen = true) }
 
                     // Update last accessed time
@@ -129,12 +132,11 @@ class PasswordListViewModel @Inject constructor(
 
     fun closeDatabase() {
         viewModelScope.launch {
-            databaseFilename?.let { filename ->
+            databaseFilenameFlow.value?.let { filename ->
                 passwordRepository.closeDatabase(filename)
             }
-
             _currentDatabase.value = null
-            databaseFilename = null
+            databaseFilenameFlow.value = null // Clear the filename
             _uiState.update {
                 it.copy(
                     isDatabaseOpen = false,
@@ -163,7 +165,7 @@ class PasswordListViewModel @Inject constructor(
 
     fun toggleFavorite(entry: PasswordEntry) {
         viewModelScope.launch {
-            databaseFilename?.let { filename ->
+            databaseFilenameFlow.value?.let { filename ->
                 val result = passwordRepository.toggleFavorite(
                     filename,
                     entry.id,
@@ -181,7 +183,7 @@ class PasswordListViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isDeleting = true, error = null) }
 
-            databaseFilename?.let { filename ->
+            databaseFilenameFlow.value?.let { filename ->
                 val result = passwordRepository.deleteEntry(filename, entry)
                 result.fold(
                     onSuccess = {
@@ -212,13 +214,9 @@ class PasswordListViewModel @Inject constructor(
         }
     }
 
-    fun getEntryById(entryId: Int): PasswordEntry? {
-        return null
-    }
-
     fun refreshEntries() {
-        // Entries are automatically refreshed via Flow
-        _uiState.update { it.copy(error = null) }
+        // This is no longer needed as the flow is now fully reactive.
+        // Kept for compatibility if called from UI, but it does nothing.
     }
 
     private fun resetFilters() {
